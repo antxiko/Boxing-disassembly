@@ -1,0 +1,3483 @@
+# ======================================================================
+# KONAMI'S BOXING (Konami RC-736, 1985)
+# ======================================================================
+# Anotaciones del desensamblado. Formato: ver la cabecera de tools/mkasm.py.
+#
+# Cada directiva D declara un rango de datos con su nombre y con la MEDIDA de
+# la que sale. Ningun limite esta puesto a ojo.
+
+# ======================================================================
+# LAS DOS CABECERAS
+# ======================================================================
+D 0x4000 0x4010 cabecera_del_cartucho  "AB" y la direccion de INIT (0x4091); STATEMENT, DEVICE y TEXT a cero, y los seis bytes reservados tambien
+F 0x4000 2,w4,6
+
+D 0x4010 0x4025 cabecera_del_game_master  la SEGUNDA cabecera, la vieja: "AB" 07 36 y los 19 bytes que el Konami Game Master se lleva tal cual de 0x4012 a 0xD300
+F 0x4010 2,19
+
+# La marca que Konami escondio al final del cartucho. El hallazgo es de Manuel
+# Pazos (@ManuelPazosMSX): titulo en katakana AL REVES, longitud, las dos
+# cifras del RC en BCD y 0xAA. tools/marca_konami.py lo lee:
+#   RC-736, 13 bytes -> KO NA MI NO HO " KU SI N KU " = コナミのボクシング
+D 0xbff0 0xc000 marca_oculta_de_konami  el numero de catalogo y el titulo en katakana, escondidos detras del relleno 0xFF
+F 0xbff0 16
+
+# ======================================================================
+# EL ARMAZON: lo que este cartucho comparte con los demas Konami
+# ======================================================================
+# No es de oidas. tools/comun_normalizado.py da 16 tramos y 561 bytes en comun
+# con Knightmare (RC-739) y 18 tramos y 562 con The Goonies (RC-734), y
+# tools/porta_nombres.py traduce las direcciones una a una. Los nombres de
+# abajo vienen de ahi, pero NINGUNO se ha heredado a ciegas: cada rutina esta
+# leida aqui antes de quedarse con el nombre.
+#
+# El despachador es el mismo y hasta cae en la MISMA direccion que en
+# Knightmare: 0x406C.
+
+L 0x4026 escribe_una_casilla        Escribe A en el puerto de datos del VDP, fijando antes la direccion
+L 0x402E suma_a_hl                  HL += A, sin signo
+L 0x4033 suma_a_de                  DE += A, sin signo
+L 0x403D gancho_de_interrupcion     Lo que hace el cartucho en cada cuadro. INIT lo cuelga de H.KEYI (0xFD9A)
+L 0x406C despacha                   Salta a la entrada A de la tabla de palabras que sigue al `call`: saca de la pila la direccion de retorno, que ES la tabla
+L 0x4076 borra_texto                Como pinta_texto pero con la mascara a 0x00: escribe ceros donde el otro escribe las casillas, o sea que BORRA el mismo rotulo
+L 0x407A pinta_texto                Guion de rotulos: palabra con la direccion de VRAM, codigos de casilla, 0xFE para cambiar de sitio y 0xFF para acabar
+L 0x407C pinta_texto_con_mascara    El cuerpo comun a los dos: C ya trae la mascara
+L 0x4082 byte_del_guion             Cada vuelta lee un codigo del guion
+L 0x40DB avanza_el_reloj            Baja los tres temporizadores y despacha la escena
+L 0x4223 rellena_de_ceros           Pone a cero BC+1 bytes desde HL, con el `ldir` que se copia a si mismo
+L 0x4418 pon_los_registros_del_vdp  Los ocho registros del VDP, de la tabla de 0x4429
+L 0x4571 rellena_la_vram            Escribe A en BC posiciones de VRAM desde HL
+L 0x4586 vuelca_en_la_vram          Copia BC bytes de (DE) a la VRAM desde HL
+L 0x45A9 rellena_los_tres_bancos    Lo mismo en los tres tercios de la pantalla, 0x800 en 0x800
+L 0x45BA descomprime_en_tres_bancos Un guion comprimido en los tres tercios
+L 0x45DD descomprime_desde_palabra  Guion comprimido que empieza por la direccion de VRAM
+L 0x45E3 descomprime                Guion comprimido con la direccion de VRAM ya fijada en HL
+L 0x45E6 sigue_descomprimiendo      El cuerpo del bucle: se entra aqui para continuar donde lo dejo el anterior
+L 0x45FF prepara_la_escritura       SETWRT y el puerto de datos del VDP en C
+L 0x539D pinta_por_filas            Guion por filas: 0xFF baja una fila, 0x00 acaba, y B desplaza el codigo de casilla
+
+# ======================================================================
+# LOS GUIONES: cada uno medido RECORRIENDOLO, no a ojo
+# ======================================================================
+# tools/formatos.py implementa los tres formatos con el mismo algoritmo que el
+# Z80 y devuelve donde acaba cada guion. La prueba de que los limites son los
+# buenos es que la cadena CIERRA: de 0x59C4 a 0x695A cada bloque acaba
+# exactamente donde empieza el siguiente, sin un hueco ni un solape.
+# tools/clasifica_guiones.py es lo que empareja cada bloque con quien lo lee.
+
+D 0x465c 0x46f3 guion_del_cartel_de_konami  Guion comprimido: 216 bytes en los TRES bancos desde 0x2008. Lo vuelca monta_el_cartel (0x4616)
+F 0x465c 16
+
+D 0x59c4 0x5af4 guion_de_la_fuente  Guion comprimido: 368 bytes desde 0x2180, que son CUARENTA Y SEIS casillas de ocho filas, los codigos 0x30 a 0x5D. Casi ASCII, con tres cambios medidos dibujandola: 0x3A es un circulo, 0x40 un guion, 0x51 un PUNTO MEDIO en vez de la Q y 0x5A (la Z) esta en blanco
+F 0x59c4 16
+
+D 0x5af4 0x5b18 guion_del_borde  Guion comprimido de 40 bytes, volcado por monta_el_combate (0x555A)
+F 0x5af4 16
+
+D 0x5b18 0x5b29 rotulo_push_space_key  "PUSH SPACE KEY" en la fila 16, columna 9. Parpadea: 0x42BF alterna pinta_texto y borra_texto con el bit 4 del contador de cuadros
+F 0x5b18 17
+
+D 0x5b29 0x5baf rotulo_de_la_presentacion  Guion de rotulos de 110 casillas en OCHO tramos, el cartel de la presentacion
+F 0x5b29 16
+
+D 0x5baf 0x5bbc rotulo_game_over  "GAME  OVER" en la fila 11, columna 11
+F 0x5baf 13
+
+D 0x5bbc 0x5bd6 rotulo_konami_software  Doce casillas del logotipo en la fila 10 y "SOFTWARE" debajo, en la fila 11
+F 0x5bbc 13
+
+D 0x5bd6 0x5d59 guion_de_la_presentacion  Guion comprimido de 896 bytes. Lo vuelca 0x42E4
+F 0x5bd6 16
+
+D 0x5d59 0x5d60 guion_de_siete_bytes  Guion comprimido cortisimo: siete bytes que escriben 160. Lo vuelca 0x414D
+F 0x5d59 7
+
+D 0x5d60 0x66cb guion_del_cuadrilatero  El guion gordo: 4552 bytes en VEINTE tramos, la pantalla de combate entera. La cola desde 0x6632 se vuelve a leer sola para rehacer solo lo que cambia
+F 0x5d60 16
+
+D 0x66cb 0x670e guion_del_cuadrilatero_2  La continuacion, leida sin volver a fijar la VRAM: 64 bytes mas. Su cola, desde 0x66DC, tambien se relee sola
+F 0x66cb 16
+
+D 0x670e 0x67c3 guion_de_los_marcadores  216 bytes desde 0x0300
+F 0x670e 16
+
+D 0x67c3 0x67c8 guion_de_cinco_bytes  Cinco bytes que escriben 127
+F 0x67c3 5
+
+D 0x67c8 0x680c panel_izquierdo  Guion por filas: 64 casillas en CUATRO filas de dieciseis, en la fila 1 columna 0
+F 0x67c8 17
+
+D 0x680c 0x6850 panel_derecho  El otro, igual de medido: 64 casillas en cuatro filas de dieciseis, en la fila 1 columna 16
+F 0x680c 17
+
+# ======================================================================
+# LOS CUATRO ARCHIVOS DE FIGURAS: 20 KB de los 32 del cartucho
+# ======================================================================
+# De 0x707E a 0xBFF0 no hay ni una `ld hl,NNNN` que apunte dentro salvo a la
+# PRIMERA tabla, la de 0x7086: todo lo demas se alcanza indexando. Asi que lo
+# que hay ahi no se puede decir mirandolo, hay que hacer lo mismo que el Z80.
+# Eso es tools/archivo_de_figuras.py, y explica 20.306 de los 20.338 bytes.
+#
+# Cuatro archivos, cada uno con su tabla: 0x7086, 0x825C, 0x9670 y 0xABB4. Las
+# cuatro se cierran con la regla de la entrada mas baja y las cuatro dan
+# DIECINUEVE entradas clavadas.
+#
+# La forma de una figura sale de leer 0x4F87..0x505C:
+#     +0        cuatro punteros a los guiones de fondo, que 0x4FC5 y 0x4FD1
+#               vuelcan en patrones y en colores
+#     +8        N, cuantas piezas moviles lleva
+#     +9        N registros de tres bytes (el bucle de 0x5007 va de tres en tres)
+#     +9+3N     ocho bytes que 0x500C se salta con `ld a,008h`
+#     +17+3N    N punteros a las piezas, que el bucle de 0x504A recorre
+# O sea 17 + 5N de cabecera, y no es una suposicion: en la figura 0x721E da
+# 0x721E + 29 = 0x723B, que es justo donde estan los cuatro punteros de piezas,
+# y sus cuatro piezas -0x7335, 0x7351, 0x7356 y 0x7370- teselan sin un hueco
+# hasta 0x7382, que es donde empieza la figura siguiente.
+#
+# La cuenta de piezas es N o N+1: 0x5005 hace `inc b` cuando el bit 1 del
+# contador de cuadros esta puesto. Se prueban las dos y se queda la que da
+# punteros creibles; con la equivocada la tabla se lee tres bytes desplazada y
+# se sale de rango a la primera. Las SETENTA Y SEIS figuras cierran asi.
+#
+# Los guiones se meten unos dentro de otros porque COMPARTEN LA COLA: una
+# figura empieza a mitad del guion de otra para redibujar solo lo que cambia.
+# Por eso lo que se declara abajo son los tramos maximales, no un bloque por
+# guion.
+D 0x7086 0x70ac punteros_del_archivo_1  Las 19 figuras del archivo 1. La tabla la cierra su entrada mas baja, y los cuatro archivos dan 19 clavadas
+F 0x7086 w
+D 0x70ac 0x70cc cabecera_de_la_figura_70AC  Archivo 1: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0x70ac 8
+D 0x70cc 0x711b guiones_70CC  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x70cc 16
+D 0x711b 0x7146 guiones_711B  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x711b 16
+D 0x7146 0x7162 guiones_7146  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7146 16
+D 0x7162 0x717c guiones_7162  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7162 16
+D 0x717c 0x719c cabecera_de_la_figura_717C  Archivo 1: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0x717c 8
+D 0x719c 0x71ed guiones_719C  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x719c 16
+D 0x71ed 0x721e guiones_71ED  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x71ed 16
+D 0x721e 0x7243 cabecera_de_la_figura_721E  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x721e 8
+D 0x7243 0x72ee guiones_7243  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7243 16
+D 0x72ee 0x7335 guiones_72EE  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x72ee 16
+D 0x7335 0x7351 guiones_7335  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7335 16
+D 0x7351 0x7356 guiones_7351  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7351 16
+D 0x7356 0x7370 guiones_7356  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7356 16
+D 0x7370 0x7382 guiones_7370  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7370 16
+D 0x7382 0x73a2 cabecera_de_la_figura_7382  Archivo 1: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0x7382 8
+D 0x73a2 0x7453 guiones_73A2  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x73a2 16
+D 0x7453 0x74a4 guiones_7453  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7453 16
+D 0x74a4 0x74bb guiones_74A4  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x74a4 16
+D 0x74bb 0x74e0 cabecera_de_la_figura_74BB  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x74bb 8
+D 0x74e0 0x752e guiones_74E0  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x74e0 16
+D 0x752e 0x755b guiones_752E  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x752e 16
+D 0x755b 0x757c guiones_755B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x755b 16
+D 0x757c 0x758f guiones_757C  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x757c 16
+D 0x758f 0x75a7 guiones_758F  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x758f 16
+D 0x75a7 0x75cc cabecera_de_la_figura_75A7  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x75a7 8
+D 0x75cc 0x767e guiones_75CC  4 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x75cc 16
+D 0x767e 0x76e9 guiones_767E  5 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x767e 16
+D 0x76e9 0x7702 guiones_76E9  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x76e9 16
+D 0x7702 0x771f guiones_7702  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7702 16
+D 0x771f 0x773f guiones_771F  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x771f 16
+D 0x773f 0x7764 cabecera_de_la_figura_773F  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x773f 8
+D 0x7764 0x77a7 guiones_7764  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7764 16
+D 0x77a7 0x77e1 guiones_77A7  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x77a7 16
+D 0x77e1 0x77fb guiones_77E1  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x77e1 16
+D 0x77fb 0x7803 guiones_77FB  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x77fb 16
+D 0x7803 0x7832 cabecera_de_la_figura_7803  Archivo 1: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0x7803 8
+D 0x7832 0x78f3 guiones_7832  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7832 16
+D 0x78f3 0x7945 guiones_78F3  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x78f3 16
+D 0x7945 0x795b guiones_7945  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7945 16
+D 0x795b 0x7968 guiones_795B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x795b 16
+D 0x7968 0x797d guiones_7968  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7968 16
+D 0x797d 0x798b guiones_797D  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x797d 16
+D 0x798b 0x79a8 guiones_798B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x798b 16
+D 0x79a8 0x79d2 cabecera_de_la_figura_79A8  Archivo 1: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x79a8 8
+D 0x79d2 0x7a88 guiones_79D2  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x79d2 16
+D 0x7a88 0x7af2 guiones_7A88  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7a88 16
+D 0x7af2 0x7afe guiones_7AF2  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7af2 16
+D 0x7afe 0x7b06 guiones_7AFE  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7afe 16
+D 0x7b06 0x7b1b guiones_7B06  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7b06 16
+D 0x7b1b 0x7b40 cabecera_de_la_figura_7B1B  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x7b1b 8
+D 0x7b40 0x7ba3 guiones_7B40  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7b40 16
+D 0x7ba3 0x7bd9 guiones_7BA3  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7ba3 16
+D 0x7bd9 0x7bf2 guiones_7BD9  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7bd9 16
+D 0x7bf2 0x7c17 cabecera_de_la_figura_7BF2  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x7bf2 8
+D 0x7c17 0x7c77 guiones_7C17  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7c17 16
+D 0x7c77 0x7cb2 guiones_7C77  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7c77 16
+D 0x7cb2 0x7cd1 guiones_7CB2  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7cb2 16
+D 0x7cd1 0x7cf1 cabecera_de_la_figura_7CD1  Archivo 1: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0x7cd1 8
+D 0x7cf1 0x7d44 guiones_7CF1  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7cf1 16
+D 0x7d44 0x7d81 guiones_7D44  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7d44 16
+D 0x7d81 0x7da6 cabecera_de_la_figura_7D81  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x7d81 8
+D 0x7da6 0x7e46 guiones_7DA6  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7da6 16
+D 0x7e46 0x7e8b guiones_7E46  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7e46 16
+D 0x7e8b 0x7ea8 guiones_7E8B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7e8b 16
+D 0x7ea8 0x7eb5 guiones_7EA8  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7ea8 16
+D 0x7eb5 0x7ebb guiones_7EB5  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x7eb5 16
+D 0x7ebb 0x7ee0 cabecera_de_la_figura_7EBB  Archivo 1: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x7ebb 8
+D 0x7ee0 0x7fb7 guiones_7EE0  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7ee0 16
+D 0x7fb7 0x8018 guiones_7FB7  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x7fb7 16
+D 0x8018 0x804c guiones_8018  2 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8018 16
+D 0x804c 0x8064 guiones_804C  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x804c 16
+D 0x8064 0x8078 guiones_8064  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8064 16
+D 0x8078 0x808e guiones_8078  2 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8078 16
+D 0x808e 0x819f guiones_808E  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x808e 16
+D 0x819f 0x822e guiones_819F  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x819f 16
+D 0x822e 0x8244 guiones_822E  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x822e 16
+D 0x8244 0x825a cabecera_de_la_figura_8244  Archivo 1: cuatro punteros de fondo, 1 piezas de tres bytes y sus 1 punteros; mide 17 + 5*1 = 22
+F 0x8244 8
+D 0x825a 0x825c guiones_825A  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x825a 16
+D 0x825c 0x8282 punteros_del_archivo_2  Las 19 figuras del archivo 2. La tabla la cierra su entrada mas baja, y los cuatro archivos dan 19 clavadas
+F 0x825c w
+D 0x8282 0x82a7 cabecera_de_la_figura_8282  Archivo 2: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x8282 8
+D 0x82a7 0x8338 guiones_82A7  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x82a7 16
+D 0x8338 0x838b guiones_8338  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8338 16
+D 0x838b 0x83a4 guiones_838B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x838b 16
+D 0x83a4 0x83bf guiones_83A4  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x83a4 16
+D 0x83bf 0x83d0 guiones_83BF  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x83bf 16
+D 0x83d0 0x83f0 cabecera_de_la_figura_83D0  Archivo 2: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0x83d0 8
+D 0x83f0 0x8479 guiones_83F0  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x83f0 16
+D 0x8479 0x84d3 guiones_8479  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8479 16
+D 0x84d3 0x84fd cabecera_de_la_figura_84D3  Archivo 2: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x84d3 8
+D 0x84fd 0x8543 guiones_84FD  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x84fd 16
+D 0x8543 0x858a guiones_8543  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8543 16
+D 0x858a 0x85a1 guiones_858A  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x858a 16
+D 0x85a1 0x85aa guiones_85A1  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x85a1 16
+D 0x85aa 0x85cf cabecera_de_la_figura_85AA  Archivo 2: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x85aa 8
+D 0x85cf 0x8619 guiones_85CF  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x85cf 16
+D 0x8619 0x864e guiones_8619  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8619 16
+D 0x864e 0x867d cabecera_de_la_figura_864E  Archivo 2: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0x864e 8
+D 0x867d 0x8737 guiones_867D  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x867d 16
+D 0x8737 0x87a3 guiones_8737  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8737 16
+D 0x87a3 0x87be guiones_87A3  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x87a3 16
+D 0x87be 0x87d4 guiones_87BE  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x87be 16
+D 0x87d4 0x87e8 guiones_87D4  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x87d4 16
+D 0x87e8 0x8801 guiones_87E8  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x87e8 16
+D 0x8801 0x8830 cabecera_de_la_figura_8801  Archivo 2: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0x8801 8
+D 0x8830 0x88c4 guiones_8830  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8830 16
+D 0x88c4 0x8932 guiones_88C4  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x88c4 16
+D 0x8932 0x894c guiones_8932  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8932 16
+D 0x894c 0x8959 guiones_894C  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x894c 16
+D 0x8959 0x8975 guiones_8959  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8959 16
+D 0x8975 0x897c guiones_8975  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8975 16
+D 0x897c 0x89a6 cabecera_de_la_figura_897C  Archivo 2: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x897c 8
+D 0x89a6 0x8a53 guiones_89A6  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x89a6 16
+D 0x8a53 0x8ac5 guiones_8A53  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8a53 16
+D 0x8ac5 0x8acf guiones_8AC5  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8ac5 16
+D 0x8acf 0x8ae3 guiones_8ACF  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8acf 16
+D 0x8ae3 0x8b0d cabecera_de_la_figura_8AE3  Archivo 2: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x8ae3 8
+D 0x8b0d 0x8bcd guiones_8B0D  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8b0d 16
+D 0x8bcd 0x8c36 guiones_8BCD  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8bcd 16
+D 0x8c36 0x8c4e guiones_8C36  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8c36 16
+D 0x8c4e 0x8c64 guiones_8C4E  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8c4e 16
+D 0x8c64 0x8c6c guiones_8C64  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8c64 16
+D 0x8c6c 0x8c82 guiones_8C6C  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8c6c 16
+D 0x8c82 0x8cb1 cabecera_de_la_figura_8C82  Archivo 2: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0x8c82 8
+D 0x8cb1 0x8cff guiones_8CB1  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8cb1 16
+D 0x8cff 0x8d34 guiones_8CFF  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8cff 16
+D 0x8d34 0x8d4c guiones_8D34  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8d34 16
+D 0x8d4c 0x8d56 guiones_8D4C  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8d4c 16
+D 0x8d56 0x8d85 cabecera_de_la_figura_8D56  Archivo 2: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0x8d56 8
+D 0x8d85 0x8dd2 guiones_8D85  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8d85 16
+D 0x8dd2 0x8e12 guiones_8DD2  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8dd2 16
+D 0x8e12 0x8e29 guiones_8E12  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8e12 16
+D 0x8e29 0x8e53 cabecera_de_la_figura_8E29  Archivo 2: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x8e29 8
+D 0x8e53 0x8eab guiones_8E53  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8e53 16
+D 0x8eab 0x8ede guiones_8EAB  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8eab 16
+D 0x8ede 0x8eeb guiones_8EDE  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x8ede 16
+D 0x8eeb 0x8f1a cabecera_de_la_figura_8EEB  Archivo 2: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0x8eeb 8
+D 0x8f1a 0x8fd4 guiones_8F1A  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8f1a 16
+D 0x8fd4 0x9033 guiones_8FD4  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x8fd4 16
+D 0x9033 0x9053 guiones_9033  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9033 16
+D 0x9053 0x9060 guiones_9053  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9053 16
+D 0x9060 0x9077 guiones_9060  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9060 16
+D 0x9077 0x9086 guiones_9077  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9077 16
+D 0x9086 0x90a1 guiones_9086  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9086 16
+D 0x90a1 0x90cb cabecera_de_la_figura_90A1  Archivo 2: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x90a1 8
+D 0x90cb 0x9186 guiones_90CB  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x90cb 16
+D 0x9186 0x91f1 guiones_9186  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9186 16
+D 0x91f1 0x9212 guiones_91F1  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x91f1 16
+D 0x9212 0x921e guiones_9212  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9212 16
+D 0x921e 0x9234 guiones_921E  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x921e 16
+D 0x9234 0x9257 guiones_9234  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9234 16
+D 0x9257 0x9286 cabecera_de_la_figura_9257  Archivo 2: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0x9257 8
+D 0x9286 0x92dc guiones_9286  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9286 16
+D 0x92dc 0x9337 guiones_92DC  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x92dc 16
+D 0x9337 0x934d guiones_9337  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9337 16
+D 0x934d 0x9362 guiones_934D  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x934d 16
+D 0x9362 0x937d cabecera_de_la_figura_9362  Archivo 2: cuatro punteros de fondo, 2 piezas de tres bytes y sus 2 punteros; mide 17 + 5*2 = 27
+F 0x9362 8
+D 0x937d 0x948e guiones_937D  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x937d 16
+D 0x948e 0x951d guiones_948E  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x948e 16
+D 0x951d 0x953d guiones_951D  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x951d 16
+D 0x953d 0x9558 guiones_953D  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x953d 16
+D 0x9558 0x9578 guiones_9558  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9558 16
+D 0x9578 0x959a guiones_9578  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9578 16
+D 0x959a 0x95b3 guiones_959A  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x959a 16
+D 0x95b3 0x95d0 guiones_95B3  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x95b3 16
+D 0x95d0 0x95f0 guiones_95D0  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x95d0 16
+D 0x95f0 0x9610 guiones_95F0  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x95f0 16
+D 0x9610 0x9633 guiones_9610  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9610 16
+D 0x9633 0x9653 guiones_9633  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9633 16
+D 0x9653 0x9669 cabecera_de_la_figura_9653  Archivo 4: cuatro punteros de fondo, 1 piezas de tres bytes y sus 1 punteros; mide 17 + 5*1 = 22
+F 0x9653 8
+D 0x966e 0x966f guiones_966E  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x966e 16
+D 0x9670 0x9696 punteros_del_archivo_3  Las 19 figuras del archivo 3. La tabla la cierra su entrada mas baja, y los cuatro archivos dan 19 clavadas
+F 0x9670 w
+D 0x9696 0x96bb cabecera_de_la_figura_9696  Archivo 3: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x9696 8
+D 0x96bb 0x976f guiones_96BB  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x96bb 16
+D 0x976f 0x97ee guiones_976F  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x976f 16
+D 0x97ee 0x980b guiones_97EE  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x97ee 16
+D 0x980b 0x9825 guiones_980B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x980b 16
+D 0x9825 0x984a cabecera_de_la_figura_9825  Archivo 3: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x9825 8
+D 0x984a 0x98fd guiones_984A  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x984a 16
+D 0x98fd 0x9957 guiones_98FD  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x98fd 16
+D 0x9957 0x997c cabecera_de_la_figura_9957  Archivo 3: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x9957 8
+D 0x997c 0x99dc guiones_997C  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x997c 16
+D 0x99dc 0x9a24 guiones_99DC  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x99dc 16
+D 0x9a24 0x9a40 guiones_9A24  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9a24 16
+D 0x9a40 0x9a65 cabecera_de_la_figura_9A40  Archivo 3: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0x9a40 8
+D 0x9a65 0x9ac6 guiones_9A65  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9a65 16
+D 0x9ac6 0x9aed guiones_9AC6  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9ac6 16
+D 0x9aed 0x9b17 cabecera_de_la_figura_9AED  Archivo 3: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x9aed 8
+D 0x9b17 0x9c02 guiones_9B17  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9b17 16
+D 0x9c02 0x9c81 guiones_9C02  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9c02 16
+D 0x9c81 0x9ca2 guiones_9C81  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9c81 16
+D 0x9ca2 0x9cbe guiones_9CA2  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9ca2 16
+D 0x9cbe 0x9cda guiones_9CBE  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9cbe 16
+D 0x9cda 0x9d04 cabecera_de_la_figura_9CDA  Archivo 3: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x9cda 8
+D 0x9d04 0x9db6 guiones_9D04  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9d04 16
+D 0x9db6 0x9e25 guiones_9DB6  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9db6 16
+D 0x9e25 0x9e41 guiones_9E25  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9e25 16
+D 0x9e41 0x9e4e guiones_9E41  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9e41 16
+D 0x9e4e 0x9e68 guiones_9E4E  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9e4e 16
+D 0x9e68 0x9e92 cabecera_de_la_figura_9E68  Archivo 3: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x9e68 8
+D 0x9e92 0x9ee8 guiones_9E92  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9e92 16
+D 0x9ee8 0x9f35 guiones_9EE8  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9ee8 16
+D 0x9f35 0x9f53 guiones_9F35  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9f35 16
+D 0x9f53 0x9f5c guiones_9F53  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0x9f53 16
+D 0x9f5c 0x9f86 cabecera_de_la_figura_9F5C  Archivo 3: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0x9f5c 8
+D 0x9f86 0xa03b guiones_9F86  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0x9f86 16
+D 0xa03b 0xa0a0 guiones_A03B  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa03b 16
+D 0xa0a0 0xa0b6 guiones_A0A0  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa0a0 16
+D 0xa0b6 0xa0c1 guiones_A0B6  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa0b6 16
+D 0xa0c1 0xa0e0 guiones_A0C1  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa0c1 16
+D 0xa0e0 0xa10a cabecera_de_la_figura_A0E0  Archivo 3: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0xa0e0 8
+D 0xa10a 0xa177 guiones_A10A  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xa10a 16
+D 0xa177 0xa1bb guiones_A177  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa177 16
+D 0xa1bb 0xa1d5 guiones_A1BB  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa1bb 16
+D 0xa1d5 0xa1e1 guiones_A1D5  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa1d5 16
+D 0xa1e1 0xa206 cabecera_de_la_figura_A1E1  Archivo 3: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0xa1e1 8
+D 0xa206 0xa2e1 guiones_A206  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xa206 16
+D 0xa2e1 0xa363 guiones_A2E1  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa2e1 16
+D 0xa363 0xa378 guiones_A363  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa363 16
+D 0xa378 0xa39d cabecera_de_la_figura_A378  Archivo 3: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0xa378 8
+D 0xa39d 0xa47e guiones_A39D  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xa39d 16
+D 0xa47e 0xa4f8 guiones_A47E  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa47e 16
+D 0xa4f8 0xa510 guiones_A4F8  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa4f8 16
+D 0xa510 0xa52b cabecera_de_la_figura_A510  Archivo 3: cuatro punteros de fondo, 2 piezas de tres bytes y sus 2 punteros; mide 17 + 5*2 = 27
+F 0xa510 8
+D 0xa52b 0xa5f1 guiones_A52B  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xa52b 16
+D 0xa5f1 0xa66d guiones_A5F1  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa5f1 16
+D 0xa66d 0xa688 cabecera_de_la_figura_A66D  Archivo 3: cuatro punteros de fondo, 2 piezas de tres bytes y sus 2 punteros; mide 17 + 5*2 = 27
+F 0xa66d 8
+D 0xa688 0xa76c guiones_A688  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xa688 16
+D 0xa76c 0xa7d2 guiones_A76C  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa76c 16
+D 0xa7d2 0xa7fc cabecera_de_la_figura_A7D2  Archivo 3: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0xa7d2 8
+D 0xa7fc 0xa8aa guiones_A7FC  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xa7fc 16
+D 0xa8aa 0xa92e guiones_A8AA  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa8aa 16
+D 0xa92e 0xa93c guiones_A92E  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xa92e 16
+D 0xa93c 0xa957 cabecera_de_la_figura_A93C  Archivo 3: cuatro punteros de fondo, 2 piezas de tres bytes y sus 2 punteros; mide 17 + 5*2 = 27
+F 0xa93c 8
+D 0xa957 0xaa67 guiones_A957  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xa957 16
+D 0xaa67 0xab20 guiones_AA67  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xaa67 16
+D 0xab20 0xab2e guiones_AB20  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab20 16
+D 0xab2e 0xab41 guiones_AB2E  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab2e 16
+D 0xab41 0xab58 guiones_AB41  2 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab41 16
+D 0xab58 0xab64 guiones_AB58  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab58 16
+D 0xab64 0xab75 guiones_AB64  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab64 16
+D 0xab75 0xab84 guiones_AB75  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab75 16
+D 0xab84 0xab97 guiones_AB84  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab84 16
+D 0xab97 0xabaa guiones_AB97  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xab97 16
+D 0xabaa 0xabb4 guiones_ABAA  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xabaa 16
+D 0xabb4 0xabda punteros_del_archivo_4  Las 19 figuras del archivo 4. La tabla la cierra su entrada mas baja, y los cuatro archivos dan 19 clavadas
+F 0xabb4 w
+D 0xabda 0xabff cabecera_de_la_figura_ABDA  Archivo 4: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0xabda 8
+D 0xabff 0xacb9 guiones_ABFF  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xabff 16
+D 0xacb9 0xad37 guiones_ACB9  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xacb9 16
+D 0xad37 0xad41 guiones_AD37  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xad37 16
+D 0xad41 0xad6b cabecera_de_la_figura_AD41  Archivo 4: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0xad41 8
+D 0xad6b 0xae19 guiones_AD6B  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xad6b 16
+D 0xae19 0xae84 guiones_AE19  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xae19 16
+D 0xae84 0xaea4 cabecera_de_la_figura_AE84  Archivo 4: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0xae84 8
+D 0xaea4 0xaf1e guiones_AEA4  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xaea4 16
+D 0xaf1e 0xaf6d guiones_AF1E  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xaf1e 16
+D 0xaf6d 0xaf92 cabecera_de_la_figura_AF6D  Archivo 4: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0xaf6d 8
+D 0xaf92 0xb011 guiones_AF92  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xaf92 16
+D 0xb011 0xb053 guiones_B011  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb011 16
+D 0xb053 0xb073 cabecera_de_la_figura_B053  Archivo 4: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0xb053 8
+D 0xb073 0xb15c guiones_B073  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb073 16
+D 0xb15c 0xb1ed guiones_B15C  4 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb15c 16
+D 0xb1ed 0xb212 cabecera_de_la_figura_B1ED  Archivo 4: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0xb1ed 8
+D 0xb212 0xb27e guiones_B212  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb212 16
+D 0xb27e 0xb2f5 guiones_B27E  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb27e 16
+D 0xb2f5 0xb30c guiones_B2F5  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb2f5 16
+D 0xb30c 0xb336 cabecera_de_la_figura_B30C  Archivo 4: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0xb30c 8
+D 0xb336 0xb3ec guiones_B336  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb336 16
+D 0xb3ec 0xb451 guiones_B3EC  3 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb3ec 16
+D 0xb451 0xb475 guiones_B451  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb451 16
+D 0xb475 0xb494 guiones_B475  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb475 16
+D 0xb494 0xb4a1 guiones_B494  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb494 16
+D 0xb4a1 0xb4cb cabecera_de_la_figura_B4A1  Archivo 4: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0xb4a1 8
+D 0xb4cb 0xb57e guiones_B4CB  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb4cb 16
+D 0xb57e 0xb5f1 guiones_B57E  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb57e 16
+D 0xb5f1 0xb602 guiones_B5F1  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb5f1 16
+D 0xb602 0xb611 guiones_B602  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb602 16
+D 0xb611 0xb63b cabecera_de_la_figura_B611  Archivo 4: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0xb611 8
+D 0xb63b 0xb701 guiones_B63B  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb63b 16
+D 0xb701 0xb782 guiones_B701  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb701 16
+D 0xb782 0xb79b guiones_B782  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb782 16
+D 0xb79b 0xb7b1 guiones_B79B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb79b 16
+D 0xb7b1 0xb7c4 guiones_B7B1  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb7b1 16
+D 0xb7c4 0xb7f3 cabecera_de_la_figura_B7C4  Archivo 4: cuatro punteros de fondo, 6 piezas de tres bytes y sus 6 punteros; mide 17 + 5*6 = 47
+F 0xb7c4 8
+D 0xb7f3 0xb8bc guiones_B7F3  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb7f3 16
+D 0xb8bc 0xb92a guiones_B8BC  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb8bc 16
+D 0xb92a 0xb938 guiones_B92A  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb92a 16
+D 0xb938 0xb954 guiones_B938  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb938 16
+D 0xb954 0xb966 guiones_B954  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xb954 16
+D 0xb966 0xb986 cabecera_de_la_figura_B966  Archivo 4: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0xb966 8
+D 0xb986 0xba6f guiones_B986  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xb986 16
+D 0xba6f 0xbb09 guiones_BA6F  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xba6f 16
+D 0xbb09 0xbb33 cabecera_de_la_figura_BB09  Archivo 4: cuatro punteros de fondo, 5 piezas de tres bytes y sus 5 punteros; mide 17 + 5*5 = 42
+F 0xbb09 8
+D 0xbb33 0xbbda guiones_BB33  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xbb33 16
+D 0xbbda 0xbc40 guiones_BBDA  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbbda 16
+D 0xbc40 0xbc4c guiones_BC40  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbc40 16
+D 0xbc4c 0xbc6a guiones_BC4C  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbc4c 16
+D 0xbc6a 0xbc8a cabecera_de_la_figura_BC6A  Archivo 4: cuatro punteros de fondo, 3 piezas de tres bytes y sus 3 punteros; mide 17 + 5*3 = 32
+F 0xbc6a 8
+D 0xbc8a 0xbd3b guiones_BC8A  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xbc8a 16
+D 0xbd3b 0xbd9d guiones_BD3B  2 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbd3b 16
+D 0xbd9d 0xbdab guiones_BD9D  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbd9d 16
+D 0xbdab 0xbdd0 cabecera_de_la_figura_BDAB  Archivo 4: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
+F 0xbdab 8
+D 0xbdd0 0xbecd guiones_BDD0  2 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
+F 0xbdd0 16
+D 0xbecd 0xbf68 guiones_BECD  3 guiones de figura y piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbecd 16
+D 0xbf68 0xbf7b guiones_BF68  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbf68 16
+D 0xbf7b 0xbf7d guiones_BF7B  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbf7b 16
+D 0xbf7d 0xbf84 guiones_BF7D  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbf7d 16
+D 0xbf84 0xbf8c guiones_BF84  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbf84 16
+D 0xbf8c 0xbfaa guiones_BF8C  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbf8c 16
+D 0xbfaa 0xbfbc guiones_BFAA  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbfaa 16
+D 0xbfbc 0xbfc3 guiones_BFBC  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbfbc 16
+D 0xbfc3 0xbfd0 guiones_BFC3  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbfc3 16
+D 0xbfd0 0xbfde guiones_BFD0  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
+F 0xbfd0 16
+
+D 0x707e 0x7086 dos_figurillas_de_cuatro_casillas  Dos blobs de cuatro casillas que 0x7066 pone en 0x3A51 (dos), 0x3A72 (una) y 0x3A92 (una): 0x707E y 0x7082
+F 0x707e 4
+
+D 0xbfde 0xbff0 relleno_antes_de_la_marca  Dieciocho bytes de 0xFF: lo que queda entre el ultimo archivo y la marca oculta de Konami
+F 0xbfde 16
+
+# ======================================================================
+# EL MOTOR DE SONIDO Y SUS GUIONES
+# ======================================================================
+# El motor entra por 0x695A (o por 0x6967, saltandose la comprobacion de que
+# no estemos en la escena 2) con el numero de sonido en A. Es el mismo motor
+# que Knightmare y The Goonies: porta_nombres.py lo reconoce entero.
+
+D 0x6bb2 0x6bbc periodos_de_los_semitonos  Diez bytes que 0x6B85 indexa y 0x6B95 desplaza para subir de octava. Son semitonos consecutivos, y se comprueba solo: 0x6B/0x40 = 1,672, que es 1,0595 elevado a NUEVE
+F 0x6bb2 10
+
+D 0x6bbc 0x6c18 punteros_de_los_sonidos  Cuarenta y seis punteros, indexados por 0x69A2 con el numero de sonido por dos. La tabla la cierra su entrada mas baja, 0x6C18, que es el primer guion. Ocho entradas apuntan al mismo 0x6F58, el guion de un solo byte
+F 0x6bbc w
+D 0x6c18 0x6c2f guion_de_sonido_6C18  23 bytes; lo nombran 1 entradas de la tabla
+F 0x6c18 16
+D 0x6c2f 0x6c49 guion_de_sonido_6C2F  26 bytes; lo nombran 1 entradas de la tabla
+F 0x6c2f 16
+D 0x6c49 0x6c5f guion_de_sonido_6C49  22 bytes; lo nombran 1 entradas de la tabla
+F 0x6c49 16
+D 0x6c5f 0x6c74 guion_de_sonido_6C5F  21 bytes; lo nombran 1 entradas de la tabla
+F 0x6c5f 16
+D 0x6c74 0x6c8a guion_de_sonido_6C74  22 bytes; lo nombran 1 entradas de la tabla
+F 0x6c74 16
+D 0x6c8a 0x6c9f guion_de_sonido_6C8A  21 bytes; lo nombran 1 entradas de la tabla
+F 0x6c8a 16
+D 0x6c9f 0x6ca8 guion_de_sonido_6C9F  9 bytes; lo nombran 1 entradas de la tabla
+F 0x6c9f 16
+D 0x6ca8 0x6cb1 guion_de_sonido_6CA8  9 bytes; lo nombran 1 entradas de la tabla
+F 0x6ca8 16
+D 0x6cb1 0x6cba guion_de_sonido_6CB1  9 bytes; lo nombran 1 entradas de la tabla
+F 0x6cb1 16
+D 0x6cba 0x6cc2 guion_de_sonido_6CBA  8 bytes; lo nombran 1 entradas de la tabla
+F 0x6cba 16
+D 0x6cc2 0x6ccb guion_de_sonido_6CC2  9 bytes; lo nombran 1 entradas de la tabla
+F 0x6cc2 16
+D 0x6ccb 0x6cce guion_de_sonido_6CCB  3 bytes; lo nombran 1 entradas de la tabla
+F 0x6ccb 16
+D 0x6cce 0x6cd7 guion_de_sonido_6CCE  9 bytes; lo nombran 1 entradas de la tabla
+F 0x6cce 16
+D 0x6cd7 0x6cdf guion_de_sonido_6CD7  8 bytes; lo nombran 1 entradas de la tabla
+F 0x6cd7 16
+D 0x6cdf 0x6ce8 guion_de_sonido_6CDF  9 bytes; lo nombran 1 entradas de la tabla
+F 0x6cdf 16
+D 0x6ce8 0x6d27 guion_de_sonido_6CE8  63 bytes; lo nombran 1 entradas de la tabla
+F 0x6ce8 16
+D 0x6d27 0x6d56 guion_de_sonido_6D27  47 bytes; lo nombran 1 entradas de la tabla
+F 0x6d27 16
+D 0x6d56 0x6d72 guion_de_sonido_6D56  28 bytes; lo nombran 1 entradas de la tabla
+F 0x6d56 16
+D 0x6d72 0x6d9a guion_de_sonido_6D72  40 bytes; lo nombran 1 entradas de la tabla
+F 0x6d72 16
+D 0x6d9a 0x6dc2 guion_de_sonido_6D9A  40 bytes; lo nombran 1 entradas de la tabla
+F 0x6d9a 16
+D 0x6dc2 0x6dd7 guion_de_sonido_6DC2  21 bytes; lo nombran 1 entradas de la tabla
+F 0x6dc2 16
+D 0x6dd7 0x6de6 guion_de_sonido_6DD7  15 bytes; lo nombran 1 entradas de la tabla
+F 0x6dd7 16
+D 0x6de6 0x6e00 guion_de_sonido_6DE6  26 bytes; lo nombran 1 entradas de la tabla
+F 0x6de6 16
+D 0x6e00 0x6e28 guion_de_sonido_6E00  40 bytes; lo nombran 1 entradas de la tabla
+F 0x6e00 16
+D 0x6e28 0x6e30 guion_de_sonido_6E28  8 bytes; lo nombran 1 entradas de la tabla
+F 0x6e28 16
+D 0x6e30 0x6e38 guion_de_sonido_6E30  8 bytes; lo nombran 1 entradas de la tabla
+F 0x6e30 16
+D 0x6e38 0x6e40 guion_de_sonido_6E38  8 bytes; lo nombran 1 entradas de la tabla
+F 0x6e38 16
+D 0x6e40 0x6e55 guion_de_sonido_6E40  21 bytes; lo nombran 1 entradas de la tabla
+F 0x6e40 16
+D 0x6e55 0x6e6e guion_de_sonido_6E55  25 bytes; lo nombran 1 entradas de la tabla
+F 0x6e55 16
+D 0x6e6e 0x6e85 guion_de_sonido_6E6E  23 bytes; lo nombran 1 entradas de la tabla
+F 0x6e6e 16
+D 0x6e85 0x6ea5 guion_de_sonido_6E85  32 bytes; lo nombran 1 entradas de la tabla
+F 0x6e85 16
+D 0x6ea5 0x6ec6 guion_de_sonido_6EA5  33 bytes; lo nombran 1 entradas de la tabla
+F 0x6ea5 16
+D 0x6ec6 0x6efe guion_de_sonido_6EC6  56 bytes; lo nombran 1 entradas de la tabla
+F 0x6ec6 16
+D 0x6efe 0x6f19 guion_de_sonido_6EFE  27 bytes; lo nombran 1 entradas de la tabla
+F 0x6efe 16
+D 0x6f19 0x6f32 guion_de_sonido_6F19  25 bytes; lo nombran 1 entradas de la tabla
+F 0x6f19 16
+D 0x6f32 0x6f58 guion_de_sonido_6F32  38 bytes; lo nombran 1 entradas de la tabla
+F 0x6f32 16
+D 0x6f58 0x6f59 guion_de_sonido_6F58  1 bytes; lo nombran 9 entradas de la tabla
+F 0x6f58 16
+
+# ======================================================================
+# LAS TABLAS DE 0x6850 A 0x695A
+# ======================================================================
+
+D 0x6850 0x6854 el_castigo_de_cada_golpe  Lo que suma cada golpe al que lo recibe: 12 el 5, 10 el 6, 9 el 7 y 2 el 8
+F 0x6850 4
+
+D 0x6854 0x6858 lo_que_cansa_cada_golpe  Lo que se cobra el golpe a QUIEN LO DA, sumado a su propio castigo al acabar: 3 el golpe 5, 2 el 6 y 1 los otros dos
+F 0x6854 4
+
+# 0x4C0B la indexa con (0xE207) & 3 por VEINTICUATRO -el `add a,a`x3, `ld b,a`,
+# `add a,a`, `add a,b` de 0x4C13 a 0x4C18-, y dentro con (0xE254) & 7 por TRES
+# -el `rlca`, `add a,b` de 0x4C22-. O sea cuatro grupos de ocho ternas.
+# OJO, medido y no resuelto: cuatro grupos de 24 pedirian 96 bytes y hasta
+# 0x68B8, pero en 0x68A8 empieza ya la tabla de punteros de los retratos. El
+# cuarto grupo se queda en OCHO bytes. Si (0xE207) & 3 llega a valer 3 con un
+# indice alto, la lectura se mete en los punteros; que llegue o no a pasar no
+# lo dice el listado.
+D 0x6858 0x68a8 ternas_por_grupo  Cuatro grupos de ocho ternas. Del cuarto grupo (0x68A0) solo hay ocho bytes, y 0x4C33 los lee aparte con `ld a,r` -o sea AL AZAR- y `and 007h`
+F 0x6858 8
+
+D 0x68a8 0x68b2 punteros_de_los_retratos  Cinco punteros que 0x5520 indexa. Los dos primeros son el mismo, 0x68B2, y los otros tres van de 42 en 42
+F 0x68a8 w
+
+D 0x68b2 0x68dc retrato_1  Retrato de SEIS casillas de ancho por SIETE de alto: el bucle de 0x5536 hace siete vueltas de seis bytes bajando 0x20 cada una. 6 x 7 = 42, que es justo lo que separa a un retrato del siguiente
+F 0x68b2 6
+
+D 0x68dc 0x6906 retrato_2  El segundo, igual de medido: 42 bytes, 6 x 7
+F 0x68dc 6
+
+D 0x6906 0x6930 retrato_3  El tercero de los cuatro, con el mismo formato que los otros tres
+F 0x6906 6
+
+D 0x6930 0x695a retrato_4  El cuarto, que cierra justo donde empieza el motor de sonido
+F 0x6930 6
+
+D 0x9669 0x9670 pieza_vacia_del_archivo_3  El puntero 0x966E repetido y la pieza que apunta: `00 20`, o sea treinta y dos ceros. Un sprite en blanco
+F 0x9669 7
+
+# ======================================================================
+# LAS TABLAS CORTAS, cada una con quien la lee
+# ======================================================================
+
+D 0x4025 0x4026 relleno_tras_la_cabecera  Un byte a cero entre la cabecera del Game Master y la primera rutina
+F 0x4025 1
+
+D 0x411c 0x4132 tabla_de_las_escenas  Las ONCE escenas del juego, indexadas por (0xE000). Va detras del unico `call 406Ch` del cartucho, que es lo que fija su tamano: la entrada mas baja, 0x4132, es la primera escena
+F 0x411c w
+
+D 0x432c 0x4338 tres_registros_de_cuatro  Tres registros de cuatro bytes que 0x431C copia con `ldir`; los dos primeros de cada uno son iguales (0xC058)
+F 0x432c 4
+
+D 0x4429 0x4431 registros_del_vdp  Los ocho registros que 0x4418 escribe en orden. R2 = 0x0E pone los nombres en 0x3800; R3 = 0x7F y R4 = 0x07 ponen los COLORES en 0x0000 y los PATRONES en 0x2000, o sea la VRAM al reves de lo habitual
+F 0x4429 8
+
+D 0x4563 0x4567 banderas_de_las_cuatro_opciones  El byte de banderas que deja cada opcion del menu en (0xE002): 0x40, 0x50, 0x61, 0x71. El bit 0 dice que juegan DOS y el bit 4 que se juega la variante dura
+F 0x4563 4
+
+D 0x4c72 0x4c92 acciones_por_mando  Las 32 combinaciones de los cinco bits del mando traducidas a accion: arriba 3, abajo 1, izquierda 9, derecha 0x0A, golpe 8, golpe+arriba 5, golpe+abajo 6, golpe+izquierda 4 y golpe+derecha 7. Las otras 23 dan cero
+F 0x4c72 8
+
+D 0x4dde 0x4dfd rampa_de_treinta_y_uno  Treinta y un bytes que bajan de 0x4C a 0x0C y se quedan planos al final; los cargan 0x4ADD y 0x4BD1
+F 0x4dde 16
+
+D 0x4dfd 0x4e02 el_tope_plano_y_los_cuatro_ruidos  El primero, 0x0C, es el tope que 0x4AD6 y 0x4BCA usan cuando (0xE206) llega a 0x20; los cuatro de detras -0x51, 0x4F, 0x51 y 0x4D- son el ruido de cada uno de los cuatro golpes, que 0x4D3A indexa
+F 0x4dfd 5
+
+D 0x524b 0x5254 nueve_unos  Nueve bytes, los cinco primeros a uno
+F 0x524b 9
+
+D 0x5254 0x526f nueve_ternas  Veintisiete bytes que 0x5110 recorre de tres en tres
+F 0x5254 3
+
+D 0x52bc 0x52c4 cuatro_direcciones_de_vram  Cuatro palabras -0x6980, 0x6AC0, 0x6C00 y 0x6D40- que 0x4F76 indexa; con el bit 14 quitado son 0x2980, 0x2AC0, 0x2C00 y 0x2D40
+F 0x52bc w
+
+# Las tres tablas de archivo del RIVAL, y el cuarto que no existe.
+# 0x4F8D las indexa con (0xE207) & 3, y las tres palabras son 0x825C, 0x9670 y
+# 0xABB4: las tablas de los archivos de figuras 2, 3 y 4. La CUARTA palabra
+# caeria en 0x52CF, que ya es codigo -los dos primeros bytes de L_52CF-, y da
+# 0x8321. No se lee nunca: 0x423B fuerza el salto al siguiente grupo de
+# dieciseis en cuanto (0xE207) & 3 llega a 2, asi que el indice solo vale 0, 1
+# o 2. De ahi que haya SEIS rivales y solo TRES juegos de figuras: los tres
+# segundos son los tres primeros con el color cambiado (0x526F y 0x51BE).
+D 0x52c4 0x52c9 patrones_de_partida_del_boxeador  Cinco bytes -0xA8, 0x30, 0x58, 0x80 y 0xA8- que 0x5155 lee desde el primero y 0x5207 desde el segundo, con el mismo indice: la misma vuelta, corrida un puesto
+F 0x52c4 5
+
+D 0x52c9 0x52cf tablas_de_los_archivos_del_rival  Las tres tablas de archivo que 0x4F8D indexa con (0xE207) & 3: 0x825C, 0x9670 y 0xABB4, o sea los archivos de figuras 2, 3 y 4
+F 0x52c9 w
+
+D 0x53d5 0x53d9 dos_guiones_por_filas  Dos punteros, 0x53D9 y 0x53DF, que 0x53CA indexa
+F 0x53d5 w
+
+D 0x53d9 0x53df guion_por_filas_1  Seis casillas en una fila: 0x84 y cuatro mas
+F 0x53d9 6
+
+D 0x53df 0x53e6 guion_por_filas_2  Siete casillas en una fila
+F 0x53df 7
+
+D 0x5445 0x5448 tres_topes  0x1A, 0x14 y 0x10; los cargan 0x4D6E, 0x540F y 0x542D
+F 0x5445 3
+
+D 0x54a1 0x54b7 las_veintidos_casillas_de_la_barra  La tira de la barra de castigo, que 0x5448 copia a 0xE2B0 para comersela por los dos extremos antes de volcarla a la fila 22
+F 0x54a1 8
+
+D 0x561f 0x5624 estado_y_reloj_de_arranque  Lo que 0x560E copia a 0xE211: el byte de estado a cero y el reloj del asalto, "3", la casilla 0x1C que hace de dos puntos, "0" y "1". La primera bajada lo deja en 3:00, o sea tres minutos
+F 0x561f 5
+
+# LOS NOMBRES. 0x558D indexa esta tabla con (0xE207) -mas tres si tiene el bit
+# 4 puesto- y `and 00Fh`, y el guion que sale lo descomprime 0x559A sobre
+# 0x3822, o sea la fila 1 del marcador. La tabla la cierra su entrada mas
+# baja: SEIS. Ojo, el `and 00Fh` deja pasar hasta el 15, asi que un valor por
+# encima de cinco leeria los propios nombres como si fueran punteros; que eso
+# llegue a pasar no lo dice el listado.
+D 0x5661 0x566d punteros_de_los_nombres  Los seis rivales, en el orden en que los indexa 0x558D con (0xE207) mas tres si lleva el bit 4
+F 0x5661 w
+
+D 0x566d 0x5678 nombre_red_wolf  "RED.WOLF" con una casilla de adorno delante (la 0x04, que no es de la fuente)
+F 0x566d 11
+
+D 0x5678 0x5683 nombre_m_b_alli  "M.B.ALLI", con el punto medio de la casilla 0x51 y el adorno 0x04 delante
+F 0x5678 11
+
+D 0x5683 0x568e nombre_moai_king  "MOAI.KING", con el punto medio de la casilla 0x51 y sin adorno delante
+F 0x5683 11
+
+D 0x568e 0x5699 nombre_sanchess  "SANCHESS", ocho letras con el adorno 0x04 delante
+F 0x568e 11
+
+D 0x5699 0x56a5 nombre_china_khan  "CHINA.KHAN", el mas largo: diez casillas
+F 0x5699 12
+
+D 0x56a5 0x56af nombre_moai_jr  "MOAI.Jr.": la casilla 0x58 no es la X del ASCII sino un glifo con la "r" y el punto juntos, y dibujando la fuente se lee claro. Es el hijo de MOAI KING, y comparte con el las figuras del archivo 4
+F 0x56a5 10
+
+D 0x56af 0x56b4 nombre_del_jugador  "RYU". No sale de la tabla de los seis: lo pone 0x55A0 aparte, en 0x3837
+F 0x56af 5
+
+D 0x5950 0x595a ruidos_de_la_cuenta  El ruido de cada numero de la cuenta del arbitro, que 0x5727 indexa con (0xE22C) menos uno: 04 04 05 04 04 05 04 04 05 06
+F 0x5950 10
+
+D 0x7011 0x7015 casillas_de_la_marca_del_asalto  Las dos casillas que 0x6FF7 pone en la fila 14 columna 17, una pareja por asalto menos uno, y 0x7066 vuelca en 0x39D1
+F 0x7011 2
+
+D 0x7015 0x701d punteros_de_los_guiones_de_entrada  Cuatro punteros: 0x701D, 0x702A, 0x7037 y 0x704B. 0x6FB6 los indexa partiendo de 0x7013, o sea que la entrada 0 es la de 0x7015
+F 0x7015 w
+
+D 0x701d 0x702a guion_de_piezas_1  Trece bytes de ternas que 0x6FD4 pasa a 0xE114, sumando 0x78 a la primera y (0xE112) a la segunda; el 0xFF acaba
+F 0x701d 13
+
+D 0x702a 0x7037 guion_de_piezas_2  Otros trece bytes con el mismo formato: fila, columna, patron y color por sprite, y 0xFF al final
+F 0x702a 13
+
+D 0x7037 0x704b guion_de_piezas_3  Veinte bytes, o sea cinco sprites: el guion mas largo de los cuatro
+F 0x7037 13
+
+D 0x704b 0x704c guion_de_piezas_vacio  Un solo 0xFF: ninguna pieza
+F 0x704b 1
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x4026 ======================================================================
+B 0x4026 EL ARMAZON
+B 0x4026 ======================================================================
+B 0x4026 Lo que este cartucho comparte con los demas Konami de la epoca. No es
+B 0x4026 de oidas: comun_normalizado.py da 561 bytes en comun con Knightmare
+B 0x4026 (RC-739) y 562 con The Goonies (RC-734), y el despachador cae hasta en
+B 0x4026 la MISMA direccion que en Knightmare, 0x406C.
+C 0x4026 A, al puerto de datos del VDP, fijando antes la direccion
+C 0x402e HL += A, sin signo; el `ret nc` se ahorra el acarreo
+C 0x4033 lo mismo con DE
+C 0x4038 el puerto de datos del VDP en C. Nadie llama aqui
+B 0x403d ----------------------------------------------------------------------
+B 0x403d El gancho de interrupcion. INIT lo cuelga de H.KEYI y se queda en un
+B 0x403d `jr $`, asi que TODO el juego pasa por aqui, una vez por cuadro.
+C 0x403d leer el estado del VDP es lo que baja la peticion de interrupcion
+C 0x4041 el sonido, siempre, aunque el cuadro anterior no haya acabado
+C 0x4044 el cerrojo: si el cuadro anterior sigue dentro, no se entra otra vez
+C 0x404b se echa el cerrojo
+C 0x404c y a partir de aqui ya se puede interrumpir
+C 0x4051 los dos juegos de sprites, uno en cada banco de registros
+C 0x405b el reloj y la escena que toque
+C 0x405f y se levanta el cerrojo
+C 0x4067 si el VDP dice que hubo colision, el sonido otra vez
+B 0x406c ----------------------------------------------------------------------
+B 0x406c El despachador. La tabla NO se le pasa: es la direccion de retorno, o
+B 0x406c sea las palabras que van justo detras del `call`.
+C 0x406c A por dos, que las entradas son palabras
+C 0x406d la direccion de retorno ES la tabla
+C 0x4071 la entrada que toca, a HL
+C 0x4075 y se salta ahi sin volver
+B 0x4076 ----------------------------------------------------------------------
+B 0x4076 El guion de rotulos: una palabra con la direccion de VRAM y detras los
+B 0x4076 codigos de casilla. 0xFE cambia de sitio y 0xFF acaba. C lleva una
+B 0x4076 mascara que se aplica a cada casilla, y de ahi salen las dos entradas:
+B 0x4076 con 0xFF se escribe el rotulo y con 0x00 se escriben ceros, o sea que
+B 0x4076 SE BORRA. Asi parpadea el "PUSH SPACE KEY".
+C 0x4076 mascara a cero: borrar
+C 0x407a mascara a 0xFF: escribir
+C 0x407d los dos primeros bytes son la direccion de VRAM
+C 0x4081 y el guion sigue detras
+C 0x4082 el codigo de casilla que toca
+C 0x4085 0xFF: se acabo
+C 0x4087 0xFE: cambia de sitio y vuelve a leer la direccion
+C 0x408a aqui es donde la mascara decide si se escribe o se borra
+C 0x408e la casilla siguiente
+B 0x4091 ----------------------------------------------------------------------
+B 0x4091 INIT, la direccion que declara la cabecera "AB". Se ejecuta una vez.
+C 0x4092 en que ranura primaria estamos
+C 0x409c EXPTBL, para saber si la ranura esta expandida
+C 0x40ac deja el cartucho fijo en la pagina 2
+C 0x40b2 modo 1: la interrupcion entra por 0x0038 y de ahi a H.KEYI
+C 0x40b4 un `jp` en H.KEYI (0xFD9A)...
+C 0x40b7 ...que apunta al gancho de 0x403D
+C 0x40bd la pila, justo debajo de las variables
+C 0x40c0 y las variables, a cero de golpe
+C 0x40cb el cerrojo, echado, para que el primer cuadro no entre a medias
+C 0x40ce los registros del VDP y la pantalla en negro
+C 0x40d5 se lee el VDP antes de abrir
+C 0x40d9 y aqui se queda: lo demas pasa en la interrupcion
+B 0x40db ----------------------------------------------------------------------
+B 0x40db El reloj y el reparto. Se llama una vez por cuadro desde el gancho.
+C 0x40db el contador de cuadros, que casi todo el cartucho consulta
+C 0x40e0 los tres temporizadores solo bajan una vez cada 32 cuadros
+C 0x4102 con el bit 6 de (0xE002) puesto se vuelve a 0x419F al acabar...
+C 0x410c ...y si no, a 0x4502
+C 0x410f (0xE000) es la escena y (0xE001) el paso dentro de ella
+C 0x4114 la escena 3 es la unica que no lleva vuelta de hoja
+C 0x4118 la direccion de vuelta, a la pila
+C 0x4119 y a la escena que toque, de la tabla de once que va detras
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x403d ----------------------------------------------------------------------
+B 0x406c ----------------------------------------------------------------------
+B 0x4076 ----------------------------------------------------------------------
+B 0x4091 ----------------------------------------------------------------------
+B 0x40db ----------------------------------------------------------------------
+B 0x4132 ======================================================================
+B 0x4132 LAS ONCE ESCENAS
+B 0x4132 ======================================================================
+B 0x4132 (0xE000) dice en cual estamos y (0xE001) el paso dentro de ella. La
+B 0x4132 tabla de 0x411C reparte, y casi todas empiezan con `djnz` encadenados:
+B 0x4132 el paso llega en B, y cada `djnz` se come uno.
+C 0x4132 paso 1: bajar el cartel
+C 0x4134 el contador de cuadros
+C 0x4137 uno de cada dos
+C 0x4139 baja el cartel un paso; vuelve con Z cuando ya no queda
+C 0x413d y al acabar, el rotulo de KONAMI SOFTWARE
+C 0x4143 el paso siguiente arranca en cero
+C 0x4146 paso 2: esperar
+C 0x4148 el temporizador de la escena
+C 0x414d al agotarse, el guion corto de 0x5D59
+C 0x4159 paso 3
+C 0x415b si devuelve acarreo, todavia no toca
+C 0x4162 paso 4 en adelante
+C 0x4165 R4 = 0x07: los patrones en 0x2000
+C 0x416b espera al gatillo; vuelve con el signo puesto si no lo hay
+C 0x4177 la escena 1
+C 0x417a su temporizador
+C 0x4182 borra la marca de 0xE210
+C 0x4187 la escena 2 es el juego: paso 1, montar
+C 0x4189 y de ahi en adelante, el bucle de cada cuadro
+C 0x418f espera al gatillo
+C 0x4196 0x20 cuadros de espera
+C 0x4198 el temporizador de la escena
+C 0x419b y un paso mas
+C 0x41a0 la escena 4
+C 0x41aa 0x20 cuadros
+C 0x41af a la escena siguiente
+C 0x41b3 y su paso, a cero
+C 0x41c1 la escena 5 es el bucle de cada cuadro otra vez
+C 0x41c4 la escena 6 espera a que 0xE313 se calle
+C 0x41d6 "GAME  OVER"
+C 0x41de y se pasa a la escena 6... que es esta misma
+C 0x41e4 la escena 4, desde fuera
+C 0x41f0 la escena 10
+C 0x41fa la escena 7
+C 0x4200 la 7 es la unica que mira su temporizador aqui
+C 0x4208 apaga los bits 0 y 6 de (0xE002)
+C 0x420c y suena el 0x2B
+C 0x421d 0xFF bytes desde 0xE210, a cero
+C 0x4223 el `ldir` que se copia a si mismo: HL a cero, DE = HL+1
+C 0x422b la escena 8 espera a que 0xE321 se calle
+C 0x4230 (0xE206) y (0xE207): el asalto y el rival
+C 0x4245 el rival siguiente
+C 0x424f con menos de cinco, dos pasos en vez de uno
+C 0x425b y la cuenta de 0xE051, en BCD
+C 0x4264 borra la zona de trabajo
+C 0x4270 la escena 3
+C 0x4278 el bit 3 del temporizador hace parpadear
+C 0x4289 suena el 0xA2 y se esperan 0x50 cuadros
+C 0x429c el guion de 0x5C5D
+C 0x42a2 la escena 9
+C 0x42aa con 0x10 o mas, se acabo
+C 0x42b3 el sonido 0xCF
+C 0x42b9 "PUSH SPACE KEY"...
+C 0x42bf ...que parpadea con el bit 4 del contador de cuadros:
+C 0x42c6 con el bit puesto, la mascara a cero, o sea BORRAR
+C 0x42c9 y al pintor que toque
+C 0x42d0 la fuente, a la VRAM en 0x3600
+C 0x42d9 y su color, blanco sobre negro, en 0x1600
+C 0x42e4 el guion gordo de la presentacion
+C 0x42f5 la zona de trabajo, a cero
+C 0x42fe (0xE207), el rival, y (0xE208)
+C 0x4303 el bit 4 de (0xE002) cambia el reparto
+C 0x431c los tres registros de cuatro, a 0xE100
+B 0x4338 ----------------------------------------------------------------------
+B 0x4338 EL BUCLE DE CADA CUADRO. Las escenas 2 y 5 acaban aqui, y esto es todo
+B 0x4338 lo que el juego hace mientras se boxea: una llamada detras de otra.
+C 0x4338 el reparto de los sprites
+C 0x4341 el marcador de arriba
+C 0x4347 los mandos
+C 0x4350 (0xE22D) marca que hay algo pendiente
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x436b ----------------------------------------------------------------------
+B 0x436b El telon: borra la pantalla de una columna por cuadro, de derecha a
+B 0x436b izquierda, y devuelve el signo puesto mientras siga bajando.
+C 0x436b los dos contadores, 0xE003 y 0xE004
+C 0x4371 con el segundo por debajo de cero, se acabo
+C 0x4373 la columna que toca, contada al reves
+C 0x4378 las 24 filas
+C 0x437b casilla a cero
+C 0x437e la fila de abajo esta 0x20 mas alla
+B 0x4384 ----------------------------------------------------------------------
+C 0x4384 los 0x80 bytes de la tabla de sprites...
+C 0x4387 ...a 0xCF, que es una Y fuera de la pantalla: los apaga todos
+C 0x4391 el fondo de la presentacion
+C 0x4398 y se monta a trozos hasta que deje de pedir mas
+B 0x439e ----------------------------------------------------------------------
+B 0x439e Monta el fondo de la presentacion de DIECISEIS en dieciseis: cada
+B 0x439e llamada pone una columna de ocho casillas y devuelve acarreo mientras
+B 0x439e quede. (0xE00A) lleva la cuenta.
+C 0x439e R1 = 0xE2: pantalla encendida y sprites de 16x16
+C 0x43a4 por que columna vamos
+C 0x43a9 pasadas dieciseis, el rotulo y a otra cosa
+C 0x43ad la fila 0, columna 8
+C 0x43b6 siete por columna
+C 0x43ba mas 0x89: de ahi sale el primer codigo de casilla
+C 0x43bd ocho casillas hacia abajo
+C 0x43c5 la de abajo, 0x20 mas alla
+C 0x43ce acarreo: todavia queda
+C 0x43d0 al acabar, el rotulo de la presentacion
+C 0x43e5 dos casillas seguidas, la de 0xE042
+C 0x43f2 (0xE042) entre cuatro, mas cinco, en la fila 0x3A
+B 0x43fd ----------------------------------------------------------------------
+B 0x43fd El arranque de verdad: calla el PSG, apaga la VRAM entera y pone los
+B 0x43fd registros del VDP.
+C 0x43fd el registro 7 del PSG: el mezclador
+C 0x4406 y el motor de sonido se entera
+C 0x4409 el sonido 0x2B, que es el silencio
+C 0x440e los 16 KB de VRAM, a cero
+C 0x4418 los ocho registros salen de la tabla de 0x4429
+C 0x441f uno por vuelta, R0 a R7
+C 0x4431 R1 = 0xE2: pantalla encendida
+C 0x4437 R1 = 0xA2: pantalla APAGADA, para tocar la VRAM sin que se vea
+B 0x443c ----------------------------------------------------------------------
+B 0x443c Los mandos, por el PSG: el registro 15 elige la fila y el 14 la lee.
+B 0x443c El bit 7 de (0xE002) alterna entre los dos puertos, o sea entre los
+B 0x443c dos jugadores.
+C 0x4440 cambia de puerto en cada llamada
+C 0x4445 0x8F para el puerto 1...
+C 0x4449 ...y con el bit 6 puesto, para el 2
+C 0x444b registro 15: elegir
+C 0x4450 registro 14: leer
+C 0x4457 los bits llegan al reves
+C 0x4458 y solo interesan los seis de abajo
+B 0x445b ----------------------------------------------------------------------
+B 0x445b Junta lo que dicen el mando y el teclado, y guarda lo pulsado ahora
+B 0x445b junto a lo que se acaba de pulsar en este cuadro.
+C 0x445b el mando
+C 0x445f y el teclado
+C 0x4465 los dos a la vez
+C 0x4473 con una diagonal, se dejan las dos direcciones
+C 0x447b arriba+izquierda y arriba+derecha se corrigen
+C 0x4488 lo de antes, para saber que es nuevo
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x46f3 ======================================================================
+B 0x46f3 EL BOXEADOR: LO QUE HACE EN CADA CUADRO
+B 0x46f3 ======================================================================
+B 0x46f3 Los dos boxeadores tienen la misma zona de trabajo de once bytes. El
+B 0x46f3 truco es que solo hay UNA: 0x46F9 copia la del que toca a 0xE221, lo
+B 0x46f3 hace todo ahi y la devuelve. Asi el codigo no lleva indice de jugador.
+C 0x46f3 el bloque del rival esta en 0xE232
+C 0x46f9 once bytes a la zona de trabajo
+C 0x4704 y ahi se hace el cuadro
+C 0x470a de vuelta a su sitio
+C 0x470d escribe en 0x4F84, que es ROM: no hace nada. Codigo que sobro
+C 0x4711 baja dos temporizadores mas
+C 0x471c y el jugador, que esta en 0xE255
+C 0x4723 baja uno si no esta ya a cero
+B 0x4729 ----------------------------------------------------------------------
+B 0x4729 El reparto por accion: (0xE228) dice que esta haciendo el boxeador, y
+B 0x4729 de 0x0D a 0x10 hay una rutina para cada una.
+C 0x472a (0xE22F) alterna entre 0 y 1 en cada cuadro
+C 0x4732 la accion, en (0xE228)
+C 0x4735 de 0x11 en adelante no hay nada que hacer
+C 0x4739 de 0x09 a 0x0C, el bloque de 0x49BC
+C 0x4742 0x0E
+C 0x4747 0x0F
+C 0x474c 0x10
+C 0x4751 0x0D
+C 0x4756 con el temporizador todavia corriendo, no se mueve
+C 0x475e (0xE270)
+C 0x4764 (0xE22D), lo que quedo pendiente
+C 0x4773 (0xE22C)
+C 0x477a (0xE211)
+C 0x4781 el 0 o el 1 de antes, por cuatro
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x4431 ======================================================================
+B 0x4431 EL VDP, LOS MANDOS Y LA VRAM
+B 0x4431 ======================================================================
+B 0x4431 El reparto de la VRAM va AL REVES de lo habitual, y sale de la tabla de
+B 0x4431 0x4429: colores en 0x0000, patrones en 0x2000, nombres en 0x3800,
+B 0x4431 patrones de sprite en 0x1800 y atributos en 0x3B00.
+L 0x4431 enciende_la_pantalla
+L 0x4437 apaga_la_pantalla
+B 0x443c Lee UN mando por el PSG. El bit 7 de (0xE002) alterna en cada llamada,
+B 0x443c y con el se elige el puerto: 0x8F es el 1 y 0xCF el 2. Como el gancho
+B 0x443c de interrupcion llama dos veces por cuadro, el bit vuelve solo a donde
+B 0x443c estaba. Devuelve arriba, abajo, izquierda, derecha y los dos botones
+B 0x443c en los bits 0 a 5.
+L 0x443c lee_el_mando
+C 0x443c el bit 7 de (0xE002) dice a quien le toca
+C 0x443f el byte de banderas de la partida
+C 0x4442 y se deja cambiado para la proxima
+C 0x4443 puesto quiere decir puerto 2
+C 0x4456 el PSG no se puede tocar con la interrupcion suelta
+C 0x445a con un bit por direccion y dos botones
+B 0x445b Junta el mando y el teclado en un solo byte y lo reparte en los tres
+B 0x445b que HL' trae detras: (HL'-2) la lectura del cuadro anterior, (HL'-1) lo
+B 0x445b que se acaba de pulsar y (HL') lo que sigue pulsado. El gancho de
+B 0x445b interrupcion lo llama con HL'=0xE300 y con HL'=0xE009, o sea una vez
+B 0x445b por boxeador.
+L 0x445b lee_los_mandos_de_uno
+C 0x4462 el bloque de los tres bytes viaja en HL'
+C 0x4467 el segundo boton...
+C 0x4469 ...se suma al primero, que es el bit 4
+C 0x446b cuatro direcciones y un boton
+C 0x446e hay izquierda o derecha?
+C 0x4470 la lectura, otra vez
+C 0x4476 el bloque de 0xE009 acaba en 9, el de 0xE300 en 0
+C 0x4478 y de vuelta a la lectura
+C 0x4479 al primero no se le hace nada
+C 0x447f ...o golpe+derecha
+C 0x4483 ...se cambian el uno por el otro: el segundo boxeador mira al reves
+C 0x4486 la lectura del cuadro anterior
+C 0x4489 y se guarda la de ahora
+C 0x448b si ha cambiado, todavia no vale: hace falta que repita
+C 0x448e lo ha repetido: esta vez si vale
+C 0x448f lo que se dio por bueno la ultima vez
+C 0x4490 y pasa a ser lo ultimo dado por bueno
+C 0x4492 llevaba el boton puesto?
+C 0x4496 si era el boton a secas...
+C 0x449b ...y ahora tambien, no es nuevo
+C 0x44a0 y si no ha cambiado nada, tampoco
+C 0x44a4 nada nuevo este cuadro
+C 0x44a6 lo nuevo va a (HL'-1)
+B 0x44a8 ----------------------------------------------------------------------
+B 0x44a8 El teclado, con el mismo reparto de bits que el mando. Cada boxeador
+B 0x44a8 tiene su juego de teclas, y los elige el mismo bit 7 de (0xE002).
+L 0x44a8 lee_el_teclado
+C 0x44a8 el mismo bit que eligio el puerto del mando
+C 0x44ad puesto: el segundo juego de teclas
+C 0x44af fila 7 del teclado
+C 0x44b4 su bit 6 es SELECT...
+C 0x44b5 ...que hace de segundo boton
+C 0x44b8 fila 8: el cursor, y ESPACIO en el bit 0
+C 0x44bd dos a la derecha, que las teclas no caen donde el mando
+C 0x44c0 IZQUIERDA
+C 0x44c8 DERECHA, y ESPACIO como boton
+C 0x44cd y dos mas
+C 0x44ce ARRIBA y ABAJO
+C 0x44d0 todo junto
+L 0x44d2 el_segundo_juego_de_teclas
+C 0x44d2 fila 5: la S en el bit 0
+C 0x44d7 solo la S
+C 0x44d9 la S es IZQUIERDA
+C 0x44dc fila 6: SHIFT en el bit 0
+C 0x44e1 el bit 0 al acarreo
+C 0x44e4 SHIFT es el boton
+C 0x44e6 fila 3: C, D, E y F en los bits 0 a 3
+C 0x44eb el bit 0 al acarreo: la C
+C 0x44ee la C es ABAJO
+C 0x44f1 la D queda en medio y no se usa
+C 0x44f2 la E es ARRIBA
+C 0x44f6 y una mas
+C 0x44f7 la F es DERECHA
+C 0x44fb las cuatro son el rombo alrededor de la D
+L 0x44fd lee_una_fila_del_teclado
+C 0x4500 la matriz devuelve los bits al reves
+B 0x4502 ----------------------------------------------------------------------
+B 0x4502 El menu. Aqui no se reparte por jugador: valen los dos mandos y el
+B 0x4502 teclado a la vez, y el bloque de trabajo es (0xE040) y (0xE041).
+L 0x4502 lee_el_menu
+C 0x4502 el puerto 1...
+C 0x4508 ...y el puerto 2
+C 0x450f y el teclado encima
+C 0x4513 el bloque del menu, que no es de nadie en concreto
+C 0x4516 lo de antes
+C 0x4517 y lo de ahora en su sitio
+C 0x4519 lo anterior queda en 0xE041
+C 0x451b lo que ha cambiado...
+C 0x451c solo lo que se acaba de pulsar
+C 0x451d si no hay nada nuevo, no hay nada que hacer
+C 0x4520 el temporizador de la escena, a cero
+C 0x4524 estamos en la escena 1, la del menu?
+C 0x4528 si no, es la portada: entrar al menu
+C 0x452b sin el boton, se mueve la eleccion
+C 0x452f la tabla de 0x4563
+C 0x4532 la opcion elegida, de 0 a 3
+C 0x4538 el byte que le toca
+C 0x4539 su byte de flags, que manda el resto de la partida
+C 0x453c escena 3, paso 0
+C 0x4543 a la escena 1
+C 0x4544 el marco del menu
+C 0x4547 los patrones del texto
+C 0x454a y el cartel
+L 0x454d mueve_la_eleccion
+C 0x454e borra el cursor de donde estaba
+C 0x4551 lo que se acaba de pulsar
+C 0x4552 la opcion
+C 0x4556 arriba
+C 0x455a abajo
+C 0x455f cuatro opciones, y da la vuelta
+B 0x4567 ----------------------------------------------------------------------
+B 0x4567 Lo que escribe en la VRAM. Todo pasa por prepara_la_escritura, que deja
+B 0x4567 el puerto de datos del VDP en C', asi que el bucle no vuelve a tocar el
+B 0x4567 puerto de direcciones.
+L 0x4567 borra_la_pantalla
+C 0x4567 los sprites, fuera
+C 0x456a la tabla de nombres, 0x3800 en 14 bits
+C 0x456d las 768 casillas
+C 0x4570 a cero
+C 0x4574 se entra aqui con el byte ya en A'
+C 0x4576 el puerto de datos vive en C'
+C 0x457b una casilla menos
+C 0x457d hasta que no quede ninguna
+L 0x4582 saca_el_siguiente_y_escribe
+C 0x4582 este si avanza en la tabla
+C 0x4589 byte de la tabla...
+C 0x458a ...y al puerto de datos
+C 0x458f uno menos
+C 0x4591 hasta acabar
+L 0x4595 monta_la_letra
+C 0x4595 con la pantalla apagada
+C 0x4598 el guion de los patrones de la letra
+C 0x459b patrones, casilla 0x30
+C 0x45a1 blanco sobre transparente
+C 0x45a3 los colores de las mismas casillas
+C 0x45a9 los tres tercios de la pantalla
+C 0x45ab destino y cuenta, que el bucle se los come
+C 0x45b0 el siguiente tercio esta 0x800 mas alla
+C 0x45b6 tres veces
+C 0x45ba los tres tercios
+C 0x45c1 igual, un tercio mas alla
+C 0x45c7 tres veces
+L 0x45ca vuelca_en_los_tres_bancos
+C 0x45ca el contador va en B', que aqui no se toca
+C 0x45d0 un tercio
+C 0x45d3 y el siguiente 0x800 mas alla
+C 0x45da tres veces
+C 0x45dd la palabra de delante es el destino
+C 0x45e0 a HL, que es donde va a escribir
+C 0x45e2 y el guion empieza detras
+C 0x45e6 el codigo: cuantos bytes
+C 0x45e7 los siete de abajo son la cuenta
+C 0x45ea y el byte entero otra vez, que el bit 7 es el modo
+C 0x45ec cuenta distinta de cero: guion normal
+C 0x45ee cuenta cero, o sea una marca: 0x00 o 0x80
+C 0x45ef 0x80 cambia el destino en la VRAM
+C 0x45f1 y 0x00 acaba el guion
+C 0x45f2 la cuenta cabe de sobra en C
+C 0x45f4 con el bit 7 puesto son bytes seguidos...
+C 0x45f6 ...y se copian tal cual
+C 0x45fa y sin el, un solo byte repetido C veces
+C 0x45fd y a por el siguiente
+C 0x45ff la que fija A no se pierde
+C 0x4604 el puerto de datos del VDP, de la tabla de la BIOS
+C 0x4607 y se queda en C'
+B 0x460b ----------------------------------------------------------------------
+B 0x460b El cartel de KONAMI que sube por la pantalla. Son 26 casillas en tres
+B 0x460b filas -3, 11 y 12-, y (0xE00E) lleva donde esta. Cada paso resta 0x20,
+B 0x460b o sea una fila, y borra la que deja debajo. Catorce pasos.
+L 0x460b monta_el_cartel
+C 0x460b los catorce pasos que va a subir
+C 0x4610 fila 21, columna 10
+C 0x4616 el guion de 0x465C
+C 0x4619 patrones, casilla 1
+C 0x461f los colores de las 26 casillas
+C 0x4622 26 casillas de ocho bytes
+C 0x4625 blanco sobre transparente
+L 0x462a sube_el_cartel
+C 0x462a donde estaba
+C 0x462d una fila mas arriba
+C 0x4631 y se apunta donde ha quedado
+C 0x4634 las casillas van del 1 al 26, seguidas
+C 0x4636 la primera fila, tres
+C 0x463b la segunda, once
+C 0x4641 la tercera, doce
+C 0x4645 y la de debajo se borra
+C 0x4649 un paso menos
+L 0x464e escribe_una_fila_del_cartel
+C 0x464f casilla a casilla
+C 0x4653 y son correlativas
+C 0x4657 al acabar, HL a la fila de abajo
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x46f3 Los DOS bloques y su lado, medido y cruzado dos veces:
+B 0x46f3 - 0xE232 es el boxeador de la DERECHA. 0x46F3 lo trabaja primero, y
+B 0x46f3 (0xE22F) le toca el 1: ese es el D que se usa por todas partes.
+B 0x46f3 - 0xE255 es el de la IZQUIERDA, con D = 0.
+B 0x46f3 Lo confirman dos cosas independientes: al colocarlos (0x49FE) al de
+B 0x46f3 0xE232 le toca la columna 22 y al de 0xE255 la 2; y al andar, el de
+B 0x46f3 0xE255 se acerca sumando y el de 0xE232 restando.
+B 0x46f3 El byte 7 de cada bloque -0xE239 y 0xE25C- es LA ACCION, y cada uno
+B 0x46f3 entra con la del OTRO en A: es lo unico que sabe del rival.
+L 0x46f3 el_cuadro_del_de_la_derecha
+C 0x46ff el bloque, para devolverlo luego
+C 0x4702 once bytes a la zona de trabajo de 0xE221
+L 0x470d el_cuadro_del_de_la_izquierda
+C 0x4717 HL era 0xE282, asi que ahora es 0xE251
+C 0x471f y este trabaja el bloque de 0xE255
+L 0x4723 baja_un_temporizador
+C 0x4724 ya esta a cero?
+C 0x4727 y no pasa de cero
+B 0x4729 (0xE228) es lo que esta haciendo, y de aqui sale todo. De 0x0D a 0x10
+B 0x4729 cada accion tiene su rutina; de 0x09 a 0x0C las lleva 0x49BC; y por
+B 0x4729 debajo de 0x09 se mira el mando.
+L 0x4729 el_cuadro_de_un_boxeador
+C 0x4729 la accion del rival, que se guarda en E
+C 0x472d lo de antes
+C 0x472e 0 el de la izquierda, 1 el de la derecha
+C 0x4730 y queda apuntado para el otro
+C 0x4731 D es el lado, y no se vuelve a tocar
+C 0x4734 la accion
+C 0x4737 de 0x11 en adelante no hay nada que hacer
+C 0x4738 HL a (0xE227)
+C 0x473b por debajo de 9, al mando
+C 0x473d de 9 a 0x0C, andar
+C 0x475a y el otro, en (0xE226)
+C 0x4761 hay algo en (0xE270)?
+C 0x4762 con (0xE270) puesto no se hace caso al mando
+C 0x4767 hay algo pendiente?
+C 0x4768 sin nada pendiente, al mando
+C 0x476a la accion del rival
+C 0x476b si esta en la 0x0D...
+C 0x476f ...o en la 0x10, tampoco
+C 0x4776 hay algo en (0xE22C)?
+C 0x4777 entonces no se mira el mando
+C 0x477d y si no, se mira el mando
+C 0x4780 el lado, mas uno...
+C 0x4782 ...por cuatro: 4 el de la izquierda y 8 el de la derecha
+C 0x4784 y esa es la entrada de la tabla
+C 0x4788 el de la izquierda, no
+C 0x478c la columna del de la derecha
+C 0x478f la 19
+C 0x4793 la entrada 4 de la tabla
+C 0x4797 la columna del de la izquierda
+C 0x479a la 5
+C 0x479c la 8
+B 0x47a3 ----------------------------------------------------------------------
+B 0x47a3 El mando. Cada boxeador tiene su bloque de tres bytes: el de la
+B 0x47a3 izquierda en 0xE2FE-0xE300 y el de la derecha en 0xE007-0xE009. Se mira
+B 0x47a3 primero lo que se acaba de pulsar; si no hay nada, lo que sigue
+B 0x47a3 pulsado, y solo para dejar que golpe+direccion siga andando.
+L 0x47a3 lee_lo_que_pide_el_mando
+C 0x47a3 de que lado es
+C 0x47a5 el de la derecha, por su lado
+C 0x47a7 lo que se acaba de pulsar
+C 0x47ab si hay algo nuevo, con eso basta
+C 0x47ae y si no, lo que sigue pulsado
+C 0x47b1 golpe+izquierda...
+C 0x47b5 ...o golpe+derecha
+C 0x47b9 se le quita el golpe y queda andar
+C 0x47bc el bit 0 de las banderas: con el puesto, juegan dos
+C 0x47bf el bit 0, al acarreo
+C 0x47c0 y entonces no hay nada que pensar
+C 0x47c3 la accion del rival, que L_4A6B no respeta
+C 0x47c4 con un jugador solo, aqui decide la maquina
+C 0x47c7 (0xE207), que 0x42F5 deja en 0, 1 o 0x10 segun la opcion del menu
+C 0x47ca por debajo de 2...
+C 0x47ce ...y (0xE051), las veces que se ha empezado, por debajo de 3
+C 0x47d5 y se le pone el golpe
+C 0x47d9 el nibble alto...
+C 0x47e0 ...que vale 1 con el golpe puesto
+C 0x47e2 y el bajo es la direccion
+C 0x47e4 de 9 para arriba, o sea con derecha
+C 0x47ed y se suma a (0xE254)
+C 0x47ef solo el nibble bajo sigue
+C 0x47f2 golpe con direccion, de 5 a 8
+C 0x47fa uno mas en la cuenta de 0xE26F
+C 0x47ff a los seis...
+C 0x4803 ...vuelve a cero
+C 0x4805 y se borran (0xE265) y (0xE243)
+C 0x480c la accion pedida
+L 0x480f lo_que_pide_el_de_la_derecha
+C 0x480f lo que se acaba de pulsar
+C 0x4813 hay algo nuevo?
+C 0x4816 y si no, lo mantenido
+C 0x4819 golpe+izquierda...
+C 0x481d ...o golpe+derecha
+C 0x4821 se le quita el golpe...
+C 0x4823 ...y se deshace el cambio de lado que hizo 0x4483
+C 0x4826 la escena 2
+C 0x4829 la del combate contra la maquina
+C 0x482d entonces manda ella: la entrada 4
+C 0x482f el contador de cuadros
+C 0x4832 uno de cada ocho, mas o menos
+C 0x4836 y lo que salga del registro de refresco
+C 0x4838 cinco bits: las cuatro direcciones y el golpe
+C 0x483a con el golpe siempre puesto
+C 0x483c golpe+izquierda no, que ahi se anda
+C 0x4840 golpe+abajo en su lugar
+C 0x4843 lo pedido
+C 0x4844 0x14, 0x01 y 0x03...
+C 0x4848 la 1, agacharse...
+C 0x484b ...y la 3
+C 0x484f ...y con cualquier otra cosa se borra (0xE247)
+C 0x4853 estan cerca?
+C 0x4857 lejos
+C 0x4859 lejos y con el golpe a secas
+C 0x485d se apunta en (0xE230)
+C 0x4861 golpe+izquierda, no
+C 0x4865 y sin golpe tampoco
+C 0x4869 el ultimo golpe, en (0xE200)
+C 0x486d y lo de ahora
+C 0x486f y (0xE201) cuenta uno mas
+C 0x4870 si repite, se deja
+C 0x4873 el tope de (0xE202)...
+C 0x4876 ...comparado con la cuenta de 0xE201
+C 0x4879 y si no, la cuenta a cero
+L 0x487d no_hace_nada
+C 0x487d la entrada 0 de la tabla, que no es nada
+B 0x487f ----------------------------------------------------------------------
+B 0x487f La tabla de 0x4C72 traduce lo pulsado -cinco bits: arriba, abajo,
+B 0x487f izquierda, derecha y golpe- a una de las once acciones. Las utiles:
+B 0x487f arriba 3, abajo 1, izquierda 9, derecha 0x0A, golpe 8,
+B 0x487f golpe+arriba 5, golpe+abajo 6, golpe+izquierda 4, golpe+derecha 7.
+B 0x487f Las otras 21 combinaciones dan 0, o sea nada.
+L 0x487f traduce_lo_pulsado
+C 0x4880 la tabla de 32 entradas
+C 0x4886 la accion que le toca
+C 0x4887 la accion 0, nada
+C 0x4888 y (0xE228) es donde vive
+C 0x488f de la 4 a la 8, que son los golpes...
+C 0x4893 ...hasta la 8
+C 0x4897 ...y solo las del de la derecha
+C 0x489b y se apunta un 4 en (0xE1FE)
+C 0x48a1 la 4
+C 0x48a5 la 1...
+C 0x48a9 ...y la 3
+C 0x48af (0xE272) el de la izquierda, (0xE273) el de la derecha
+C 0x48b3 uno u otro segun el lado
+C 0x48b6 agacharse deja el bit 1
+C 0x48bb de pie...
+C 0x48bf ...o agachado
+C 0x48c2 y (0xE228) se queda con los dos de abajo
+L 0x48c7 empieza_la_accion
+C 0x48c8 la 0x0A...
+C 0x48cc ...y la 9 son andar
+C 0x48d0 se apunta en (0xE225)...
+C 0x48d3 ...y en (0xE221)
+C 0x48d6 y a la accion se le suman cuatro: de la 9 a la 0x0C
+C 0x48d9 la 0x0C
+C 0x48db cuatro cuadros...
+C 0x48df ...y seis las demas
+C 0x48e2 el temporizador, en (0xE227)
+C 0x48e3 el de la izquierda, no
+C 0x48e8 con dos jugando, tampoco
+C 0x48ed y si no, lo que trajera C
+L 0x48ef entra_en_la_accion_4
+C 0x48f2 la accion 4, tal cual
+C 0x48f3 el de la derecha, siempre
+C 0x48f7 y el de la izquierda solo con dos jugando
+C 0x48fd diez cuadros
+L 0x4900 anda
+C 0x4903 lo que hace ahora
+C 0x4904 de la 4 en adelante no se anda
+C 0x4909 (0xE226)
+C 0x490d con el temporizador corriendo, tampoco
+C 0x490f estan cerca?
+C 0x4912 lejos, tres cuadros por paso...
+C 0x4918 ...y cerca, ocho
+C 0x491a el de la izquierda
+C 0x491c la accion
+C 0x491f una columna a la derecha, ocho pixeles
+C 0x4922 la 0x0A es andar a la derecha
+C 0x4926 estan cerca?
+C 0x4929 y la 9 a la izquierda
+C 0x492c pero no si estan pegados
+C 0x492e la columna
+C 0x4933 la 22 es el tope de la derecha
+C 0x4937 la columna nueva
+C 0x4939 y el pixel va detras
+C 0x493c el temporizador largo, en (0xE22B)
+C 0x4940 uno menos
+C 0x4943 mientras no de la vuelta, nada mas
+C 0x4944 al llegar a cero, 32 cuadros mas
+C 0x4946 hay algo pendiente en (0xE22D)?
+C 0x494a no
+C 0x494c y con (0xE22D) puesto, de 12 a 27 al azar
+C 0x4953 el bit que dejo 0x48AF
+C 0x4957 el de su lado
+C 0x495a (0xE228)
+C 0x495d de pie...
+C 0x4961 ...o agachado
+C 0x4964 y el bit 0 alterna en cada cuadro
+C 0x4966 y el bit 0 cambia en cada vuelta
+L 0x496a anda_el_de_la_izquierda
+C 0x496a una columna a la izquierda
+C 0x496d la 0x0A es a la derecha
+C 0x4974 y entonces suma
+C 0x4977 pero no si estan pegados
+C 0x4979 la columna
+C 0x497e la 2 es el tope de la izquierda
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x4a5f ----------------------------------------------------------------------
+B 0x4a5f La distancia entre los dos, en pixeles: el byte 9 de cada bloque. Sale
+B 0x4a5f con acarreo cuando estan a menos de 0x41, que es "cerca".
+L 0x4a5f mide_la_distancia
+C 0x4a60 el pixel del de la izquierda
+C 0x4a63 menos el del de la derecha
+C 0x4a67 0x41 pixeles es la raya
+B 0x4a6b ======================================================================
+B 0x4a6b LA MAQUINA
+B 0x4a6b ======================================================================
+B 0x4a6b Quien juega a que, medido y cruzado tres veces:
+B 0x4a6b - con el bit 0 de las banderas puesto (opciones 3 y 4 del menu) no se
+B 0x4a6b entra aqui: los dos boxeadores leen su mando;
+B 0x4a6b - sin el, esto lleva al de la IZQUIERDA, y el humano es el de la
+B 0x4a6b DERECHA, que es el que va con el puerto 1 y el cursor;
+B 0x4a6b - y en la escena 2, la demostracion, al de la derecha lo mueve el
+B 0x4a6b registro R (0x4836), asi que juegan solos los dos.
+B 0x4a6b Lo confirma que aqui se acerque andando a la DERECHA (0x4A83) y se
+B 0x4a6b retire a la izquierda (0x4B39), que es lo que le toca al de ese lado.
+B 0x4a6b Devuelve en B la accion, con un numero de propina en el nibble alto:
+B 0x4a6b ese numero se suma a (0xE254) mientras anda, y (0xE254) es lo que luego
+B 0x4a6b elige el guion de golpes en 0x4C1C.
+L 0x4a6b decide_la_maquina
+C 0x4a6b (0xE26B), su temporizador corto
+C 0x4a71 lo que esta haciendo el humano
+C 0x4a75 (0xE26A)
+C 0x4a78 sin nada apuntado ahi, se decide de cero
+C 0x4a7b (0xE212)
+C 0x4a7e con 0x30 exacto, a apartarse
+C 0x4a83 acercarse
+C 0x4a85 la distancia
+C 0x4a88 a mas de 0x49, andando
+C 0x4a8b y si no, quieto
+C 0x4a8d (0xE26B)
+C 0x4a8f mientras corra, nada
+C 0x4a92 dos golpes a (0xE26A)
+C 0x4a98 y vuelta a (0xE26B)
+C 0x4a99 ocho cuadros de espera
+L 0x4a9e decide_de_cero
+C 0x4a9e estan cerca?
+C 0x4aa1 (0xE230)
+C 0x4aa3 lejos, a lo suyo
+C 0x4aa6 cerca: se borra
+C 0x4aa8 esta contra su cuerda?
+C 0x4aad o casi, por debajo de la columna 5
+C 0x4ab4 entonces quieto
+C 0x4ab6 (0xE26B)
+C 0x4ab9 su temporizador
+C 0x4abb con el temporizador a cero, ocho cuadros
+L 0x4abe le_pega_o_se_aparta
+C 0x4abe lo que hace el humano
+C 0x4abf de la 0x0D en adelante...
+C 0x4ac4 ...o por debajo de la 5
+C 0x4ac9 contra la cuerda?
+C 0x4ace y sin llevar castigo
+C 0x4ad3 (0xE206), lo duro que juega
+C 0x4ad6 los cinco de 0x4DFD...
+C 0x4ad9 por debajo de 0x20...
+C 0x4add ...o la rampa de 0x4DDE, que baja de 0x4C a 0x0C
+C 0x4ae3 el numero que toca
+C 0x4ae4 el contador de cuadros
+C 0x4ae7 siete bits, que da la vuelta cada dos segundos
+C 0x4ae9 con el por debajo, se golpea; asi cuanto mas baja la rampa, mas
+C 0x4aea con el por encima, no
+C 0x4aec (0xE201), los golpes contados
+C 0x4af1 contra el tope de (0xE202)
+C 0x4af6 agacharse
+C 0x4af8 lo que hace el humano
+C 0x4af9 si anda a la derecha...
+C 0x4afc ...o pega bajo, agachado se queda
+C 0x4aff (0xE203), la marca de que ha decidido
+C 0x4b04 (0xE204)
+C 0x4b06 hay algo en (0xE204)?
+C 0x4b07 con algo apuntado, otra cosa
+C 0x4b09 la accion 4
+C 0x4b0b lo que hace el humano
+C 0x4b0c de la 9 en adelante
+C 0x4b11 el sonido que suena ahora
+C 0x4b14 si ya es el 3, no se repite
+C 0x4b17 y si no, el 3
+L 0x4b1c espera_su_turno
+C 0x4b1c la accion 3
+C 0x4b1e (0xE204) tiene que valer 1
+C 0x4b20 contra la cuerda?
+C 0x4b23 entonces no
+C 0x4b24 ocho cuadros...
+C 0x4b2a ...y un 0x0A en (0xE26A)
+C 0x4b2c (0xE26B), otra vez
+C 0x4b2f la accion 3
+C 0x4b31 la columna del de la izquierda
+C 0x4b34 de la 5 en adelante...
+C 0x4b39 ...andar a la izquierda, que es apartarse
+L 0x4b3c esta_lejos
+C 0x4b3c (0xE230), lo que apunto 0x485D
+C 0x4b3d hay algo?
+C 0x4b3e sin nada, se mira el castigo
+C 0x4b40 acercarse
+C 0x4b42 (0xE218)
+C 0x4b44 lo de (0xE218)
+C 0x4b47 contra (0xE21A)
+C 0x4b48 por debajo, se acerca
+C 0x4b49 y si no, quieto
+C 0x4b4b el contador de cuadros
+C 0x4b4e uno de cada 64...
+C 0x4b51 ...borra (0xE230)
+L 0x4b55 mira_lo_apuntado
+C 0x4b55 (0xE267)
+C 0x4b58 hay algo?
+C 0x4b5b se gasta
+C 0x4b5d y se aparta
+L 0x4b5f lleva_castigo
+C 0x4b5f (0xE243)
+C 0x4b62 acercarse
+C 0x4b64 con dos o mas, ya no
+C 0x4b67 y (0xE265), que cuenta hasta 3
+C 0x4b6d lleva castigo?
+C 0x4b70 sin castigo, otra cosa
+C 0x4b72 quieto
+C 0x4b74 (0xE282), el temporizador que baja 0x4711
+C 0x4b78 mientras corra, quieto
+C 0x4b79 y si no, acercarse
+L 0x4b7c descansa
+C 0x4b7c la columna del de la izquierda
+C 0x4b7f de la 5 en adelante, nada
+C 0x4b82 quieto
+C 0x4b84 el contador de cuadros
+C 0x4b87 uno de cada 128...
+C 0x4b8b ...borra (0xE243)...
+C 0x4b8e ...y (0xE265)
+L 0x4b92 se_toma_su_tiempo
+C 0x4b92 (0xE251), la pausa que baja 0x4717
+C 0x4b96 mientras corra, quieto
+C 0x4b99 del registro de refresco
+C 0x4b9b de 0 a 15
+C 0x4b9e (0xE1FE), que pone 0x489B cuando el de la derecha golpea
+C 0x4ba2 lo duro que juega
+C 0x4ba5 con algo apuntado, se salta el ruido
+C 0x4ba7 (0xE215)
+C 0x4baa 0x32...
+C 0x4bae ...o 0x36
+C 0x4bb2 (0xE313)
+C 0x4bb5 tres valores lo callan
+C 0x4bb9 0x55...
+C 0x4bbc ...o 0x54
+C 0x4bbf y si no, el sonido 1 o el 2 al azar
+C 0x4bc3 el 1 o el 2
+C 0x4bc8 y se sigue con 0x10
+C 0x4bca los cinco de 0x4DFD...
+C 0x4bd1 ...o la rampa de 0x4DDE
+C 0x4bd7 la escena 2, la demostracion
+C 0x4bde ahi la pausa es fija, 0x50 mas
+C 0x4be0 la de la tabla...
+C 0x4be1 ...mas lo del azar
+C 0x4be2 y esa es la pausa
+C 0x4be5 (0xE203), lo que dejo 0x4AFF
+C 0x4be9 hay algo?
+C 0x4bec se gasta
+C 0x4bef y (0xE204) sube uno
+C 0x4bf2 de cuatro en cuatro
+C 0x4bf8 la accion 6, pegar bajo
+C 0x4bfa lo que hace el humano
+C 0x4bfb la 0, la 1...
+C 0x4bff ...y de la 2 a la 4 se pega bajo y se acabo
+L 0x4c02 saca_el_golpe_del_guion
+C 0x4c02 (0xE250), los tres pasos del guion
+C 0x4c05 los pasos que quedan
+C 0x4c07 con el guion empezado, se sigue
+C 0x4c09 tres pasos
+C 0x4c0b los guiones de 0x6858
+C 0x4c0e (0xE207), que sale del menu
+C 0x4c11 cuatro juegos...
+C 0x4c13 por ocho...
+C 0x4c16 ...y por tres
+C 0x4c17 ...de 24 bytes cada uno
+C 0x4c1c (0xE254), lo que se acumulo andando
+C 0x4c1f ocho guiones...
+C 0x4c22 por dos...
+C 0x4c23 ...de tres bytes
+C 0x4c27 y ahi queda el puntero
+C 0x4c2b un paso menos
+C 0x4c2c (0xE21A)
+C 0x4c2f de 4 en adelante...
+C 0x4c33 ...el golpe sale de los ocho de 0x68A0
+C 0x4c36 al azar
+C 0x4c40 el paso en que va
+C 0x4c41 el puntero del guion
+C 0x4c44 en los pasos pares, el byte tal cual
+C 0x4c47 en los impares se echa a suertes
+C 0x4c4c y (0xE21B) decide si el de antes...
+C 0x4c50 el de antes...
+C 0x4c53 ...o el de despues
+C 0x4c55 el golpe
+C 0x4c57 y el puntero avanza
+C 0x4c5a el nibble bajo es la accion
+C 0x4c5d la 9, andar
+C 0x4c60 la columna del de la derecha
+C 0x4c63 de la 5 en adelante, nada
+C 0x4c66 y si no, 15 cuadros en (0xE282)
+L 0x4c6c esta_contra_la_cuerda
+C 0x4c6c la columna del de la izquierda
+C 0x4c6f el tope es la 2, asi que por debajo de 3 esta pegado
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x4c92 ======================================================================
+B 0x4c92 EL GOLPE QUE ENTRA
+B 0x4c92 ======================================================================
+B 0x4c92 Aqui se resuelve si un golpe toca. Se mira una vez por boxeador, y el
+B 0x4c92 orden lo echa a suertes la paridad de (0xE23E)+(0xE261).
+B 0x4c92 Los dos punteros son el reparto: IY va al bloque del que PEGA -dos
+B 0x4c92 bytes por delante de su base- e IX a LA ACCION del que recibe. De ahi
+B 0x4c92 que (iy+5) sea la accion del que pega y (ix+0) la del que recibe, y que
+B 0x4c92 el golpe entre con `ld (ix+000h),00eh`: la accion 0x0E es encajarlo.
+B 0x4c92 Si el castigo pasa del tope, (ix+0) pasa a 0x10, que es caer.
+L 0x4c92 mira_si_entra_el_golpe
+C 0x4c92 (0xE241), dos temporizadores mas
+C 0x4c98 y (0xE264)
+C 0x4c9d con cualquiera de los cuatro puesto no se mira nada:
+C 0x4ca2 (0xE257)...
+C 0x4ca7 ...(0xE22C)...
+C 0x4cac ...y (0xE211)
+C 0x4cb1 la accion del de la derecha, copiada a (0xE23F)
+C 0x4cb7 y la del de la izquierda a (0xE262)
+C 0x4cbd (0xE23E)...
+C 0x4cc0 ...mas (0xE261)
+C 0x4cc4 la paridad de la suma decide quien pega primero
+C 0x4cc7 el de la derecha
+C 0x4cca y luego el de la izquierda
+C 0x4ccc o al reves
+L 0x4ccf pega_el_de_la_derecha
+C 0x4ccf (0xE24D), que se va gastando bit a bit
+C 0x4cd4 sin acarreo, este cuadro no le toca
+C 0x4cd5 pega el de la derecha...
+C 0x4cd9 ...y recibe el de la izquierda
+C 0x4cdd donde se apunta el castigo
+C 0x4ce0 y (0xE21A), lo que lleva encajado
+C 0x4ce2 tienen que estar cerca
+L 0x4ce8 pega_el_de_la_izquierda
+C 0x4ce8 (0xE24C)
+C 0x4ced sin acarreo, este cuadro no le toca
+C 0x4cee pega el de la izquierda...
+C 0x4cf2 ...y recibe el de la derecha
+C 0x4cf6 donde se apunta el castigo
+C 0x4cf9 y (0xE218)
+C 0x4cfb tienen que estar cerca
+L 0x4cff el_golpe_toca
+C 0x4cff la accion del que pega
+C 0x4d02 de la 5 a la 8 son los golpes
+C 0x4d05 de la 9 en adelante, no
+C 0x4d08 y el que recibe no puede estar ya encajando
+C 0x4d0e el golpe 6, que es el bajo
+C 0x4d13 lo que hace el que recibe
+C 0x4d18 agachado, el golpe bajo no le da
+C 0x4d1f y contra los otros, agacharse...
+C 0x4d23 ...o estar de pie no vale
+C 0x4d27 la accion 4 es la guardia
+C 0x4d2c EL GOLPE ENTRA: el que recibe pasa a encajarlo
+C 0x4d30 y uno mas en su cuenta de 0xE233
+C 0x4d33 si no se pasa
+C 0x4d39 la tabla de 0x4DFE
+C 0x4d3d el golpe...
+C 0x4d42 ...que elige el ruido
+C 0x4d47 y suena
+C 0x4d4a dos cuentas mas para el que pega
+C 0x4d50 cuatro cuadros al que recibe
+C 0x4d54 el golpe, otra vez
+C 0x4d59 la tabla de 0x6850: 12, 10, 9 y 2
+C 0x4d5f y ese es el castigo del golpe
+C 0x4d61 lo que lleva encajado
+C 0x4d62 por debajo de 5 no pasa nada
+C 0x4d65 de 8 en adelante el tope es 2
+C 0x4d6b y entre medias sale de 0x5445
+C 0x4d74 y el tope, en el byte de al lado
+C 0x4d75 el castigo del golpe...
+C 0x4d76 ...mas lo que ya llevaba
+C 0x4d78 contra el tope
+C 0x4d7b por debajo, aguanta
+C 0x4d7d la accion del que pega
+C 0x4d80 y no pasa de 0x10
+C 0x4d83 el golpe 8 nunca tumba
+C 0x4d89 con 0x1C justo...
+C 0x4d8c ...se tumba de todas formas
+C 0x4d8e la cuenta de encajados
+C 0x4d8f seis
+C 0x4d92 mas 0, 1 o 2 al azar
+C 0x4d9b lo que llevaba encajado
+C 0x4d9c por debajo de 7, ese
+C 0x4da0 y si no, 0x010A
+C 0x4da3 una caida mas para el que recibe
+C 0x4da9 a la tercera...
+C 0x4dad ...se acaba: 0x0100
+C 0x4db0 y se apunta en (0xE24E) y (0xE24F)
+C 0x4db6 la accion del que recibe
+C 0x4db9 la 0x10, que es caer
+C 0x4dbc y su temporizador tambien
+C 0x4dc0 (ix-3) a cero
+C 0x4dc3 y los dos bytes de DE quedan delante
+C 0x4dc6 (0xE22C) avisa de que hay alguien en el suelo
+L 0x4dcc suena_el_bloqueo
+C 0x4dcc el ruido 0x4B
+L 0x4dd1 apunta_el_fallo
+C 0x4dd1 (0xE247), que solo cuenta uno
+C 0x4dd6 se pone a uno
+C 0x4dda y uno mas en la cuenta del que pega
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x4e02 ======================================================================
+B 0x4e02 EL MARCADOR Y LAS TARJETAS DE LOS JUECES
+B 0x4e02 ======================================================================
+B 0x4e02 Las casillas del texto son ASCII: el guion de 0x59C4 carga la letra en
+B 0x4e02 las casillas 0x30 a 0x5F, asi que 0x50 es la P y 0x4B 0x4F es "KO".
+B 0x4e02 Hay dos juegos de cifras: las de 0x30 y otras que empiezan en 0x90.
+B 0x4e02 La pantalla, contada sobre la tabla de nombres de 0x3800:
+B 0x4e02 fila 16 columna  7 -> (0xE21F), la tarjeta del de la IZQUIERDA
+B 0x4e02 fila 16 columna 23 -> (0xE21E), la del de la DERECHA
+B 0x4e02 fila 18 columna 28 -> (0xE051), el asalto
+B 0x4e02 fila 20 columna  9 y columna 26 -> las dos cifras grandes
+L 0x4e02 pinta_el_marcador
+C 0x4e02 (0xE210)
+C 0x4e05 con 3 exacto se mira otra cosa
+C 0x4e09 (0xE258), el de la izquierda
+C 0x4e0f y (0xE235), el de la derecha
+C 0x4e15 con cualquiera de los dos tocado...
+C 0x4e1a (0xE257), el de la izquierda
+C 0x4e1e ...no se pinta nada
+C 0x4e1f el contador de cuadros
+C 0x4e23 uno de cada 32...
+C 0x4e25 ...se repasan las tarjetas
+C 0x4e29 y el bit 4 las hace parpadear
+C 0x4e2d la del de la izquierda...
+C 0x4e30 ...en la fila 16, columna 7
+C 0x4e36 y la del de la derecha...
+C 0x4e39 ...en la columna 23
+L 0x4e3e repasa_las_tarjetas
+C 0x4e3e el castigo del de la derecha
+C 0x4e41 0xFF, que es lo que espera 0x53F9
+C 0x4e43 (0xE235)
+C 0x4e49 lo que lleva encajado
+C 0x4e4a con cinco o mas encajados, no
+C 0x4e51 y el castigo del de la izquierda
+C 0x4e55 (0xE258)
+C 0x4e5c igual con cinco
+L 0x4e62 borra_las_tarjetas
+C 0x4e62 la columna 7...
+C 0x4e68 ...y la 23
+C 0x4e6a dos casillas
+C 0x4e6d en blanco
+L 0x4e72 pinta_el_asalto
+C 0x4e72 fila 18, columna 28
+C 0x4e75 las veces que se ha empezado
+L 0x4e78 pinta_dos_cifras
+C 0x4e78 las cifras de 0x30, que son las normales
+L 0x4e7c pinta_dos_cifras_grandes
+C 0x4e7c y las de 0x90, que son las otras
+C 0x4e7e el numero, en BCD
+C 0x4e7f la cifra de las decenas
+C 0x4e85 si es cero...
+C 0x4e86 cero, en blanco
+C 0x4e88 ...se deja en blanco, y si no va con su juego
+C 0x4e8e y las unidades siempre
+C 0x4e90 con su juego de cifras
+B 0x4e94 ----------------------------------------------------------------------
+B 0x4e94 Las tarjetas se llevan AL REVES: aqui se van sumando faltas, y al final
+B 0x4e94 la nota es 10 menos las faltas, subidas las dos hasta que una llega al
+B 0x4e94 10. O sea el sistema de los diez puntos del boxeo de verdad.
+L 0x4e94 puntua_el_asalto
+C 0x4e94 el castigo del de la derecha
+C 0x4e98 y el de la izquierda
+C 0x4e9b las dos tarjetas, en (0xE21E) y (0xE21F)
+C 0x4e9e quien lleva mas?
+C 0x4ea1 se ordenan: A el mayor, B el menor
+C 0x4ea4 y la tarjeta, la del que peor esta
+C 0x4ea5 la diferencia
+C 0x4ea6 con tres o mas...
+C 0x4eaa ...una falta para el mas castigado
+C 0x4ead la tarjeta del mas castigado, otra vez
+C 0x4eaf los golpes acertados por el de la izquierda
+C 0x4eb3 y los del de la derecha
+C 0x4eb6 iguales, nada
+C 0x4eb9 quien menos acerto...
+C 0x4ebb y si no, la del otro
+C 0x4ebc ...se lleva la falta
+C 0x4ebd las dos tarjetas
+C 0x4ebf (0xE23E), del de la derecha
+C 0x4ec2 vale doble
+C 0x4ec3 a su tarjeta
+C 0x4ec6 y (0xE261), del de la izquierda
+C 0x4ec9 tambien doble
+C 0x4eca a la suya
+C 0x4ecd las faltas de la derecha
+C 0x4ece diez menos las faltas
+C 0x4ed2 la de la derecha, para luego
+C 0x4ed4 y lo mismo con la izquierda
+C 0x4ed9 si una quedo en diez, ya esta
+C 0x4edd la de la derecha
+C 0x4ee0 estaba a diez?
+C 0x4ee3 y si no, suben las dos a la vez...
+C 0x4ee6 ...hasta que una llegue al diez
+C 0x4eea y hasta que la otra tambien llegue
+C 0x4eed la de la derecha
+C 0x4eee y las dos notas, a BCD
+C 0x4ef4 y la de la izquierda
+C 0x4ef9 la columna 26...
+C 0x4efc ...y la 9
+C 0x4eff el de la derecha, tocado?
+C 0x4f05 o el de la izquierda?
+C 0x4f09 ninguno: al reparto normal
+C 0x4f0b y entonces se cambian
+L 0x4f0c pinta_el_ko
+C 0x4f0c el tocado se queda en 00
+C 0x4f10 y en la otra cifra...
+C 0x4f11 (0xE24F)
+C 0x4f17 ...la T de TKO
+C 0x4f1d la K...
+C 0x4f23 ...y la O
+L 0x4f28 suma_las_tarjetas
+C 0x4f28 (0xE21C), el acumulado del de la izquierda
+C 0x4f2b su nota de este asalto
+C 0x4f2f en BCD
+C 0x4f32 y (0xE21D), el de la derecha
+C 0x4f39 la columna 9...
+C 0x4f40 ...y la 26
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x4f45 ======================================================================
+B 0x4f45 DIBUJAR A LOS BOXEADORES
+B 0x4f45 ======================================================================
+B 0x4f45 Los boxeadores se pintan de dos maneras a la vez: el cuerpo son
+B 0x4f45 CASILLAS de la pantalla, que 0x4F66 saca de los archivos de figuras, y
+B 0x4f45 los guantes y la cabeza son SPRITES, que monta 0x5178. La cabecera de
+B 0x4f45 una figura -17 + 5N- esta medida arriba, en las notas de los archivos.
+L 0x4f45 prepara_el_dibujo
+C 0x4f45 el contador de cuadros
+C 0x4f48 uno de cada dos
+C 0x4f4b la columna del de la derecha
+C 0x4f4e apuntada en (0xE271)
+C 0x4f51 los cuatro bytes de 0xE248...
+C 0x4f54 ...a 0xE278
+C 0x4f5f y luego 0xE25C a 0xE27C
+C 0x4f61 y el destino, 0xE27C
+L 0x4f66 pinta_una_figura
+C 0x4f66 el contador de cuadros
+C 0x4f69 los tres de abajo
+C 0x4f6b y el bit 0 aparte
+C 0x4f6c en los impares, solo los sprites
+C 0x4f70 el sonido de la campana y demas
+C 0x4f75 palabras
+C 0x4f76 las cuatro direcciones de VRAM de 0x52BC
+C 0x4f7c la que toca
+C 0x4f7f a DE
+C 0x4f81 sin el bit 13: la misma direccion en los patrones
+C 0x4f87 la tabla del primer archivo de figuras
+C 0x4f8a el bit 0, al acarreo
+C 0x4f8b en los pares, la del boxeador
+C 0x4f8d y en los impares una de las cuatro de 0x52C9
+C 0x4f90 (0xE207)
+C 0x4f93 cuatro tablas
+C 0x4f99 y esa es la tabla
+C 0x4f9c (0xE27C), la accion copiada
+C 0x4fa1 la 0x12
+C 0x4fa5 el contador de cuadros
+C 0x4fa8 uno de cada dos
+C 0x4faa columna 22, pixel 200...
+C 0x4faf ...o columna 2, pixel 40
+C 0x4fb2 en (0xE27D)
+C 0x4fb7 palabras
+C 0x4fb8 la figura que toca
+C 0x4fbb y su direccion
+C 0x4fbf la direccion, para la siguiente
+C 0x4fc0 a HL, que es donde escribe
+C 0x4fc1 el primer puntero de la figura
+C 0x4fc5 el fondo, en las casillas
+C 0x4fc9 el segundo puntero
+C 0x4fcd el puntero
+C 0x4fd1 y este en los colores, sin fijar direccion
+C 0x4fd5 el tercero
+C 0x4fda a HL
+C 0x4fdb el puntero
+C 0x4fe0 otra vez casillas
+C 0x4fe4 y el cuarto
+C 0x4fe8 el puntero
+C 0x4fec y colores
+C 0x4ff0 detras de los cuatro punteros va la cuenta de piezas
+C 0x4ff2 donde se quedo, a (0xE278)...
+C 0x4ff9 ...con un 1 detras
+C 0x4ffb a HL
+C 0x4ffc N, las piezas moviles
+C 0x4ffe el contador de cuadros
+C 0x5001 el bit 1, al acarreo
+C 0x5003 uno de cada cuatro...
+C 0x5005 ...lleva una pieza mas
+C 0x5006 saltarse la cuenta
+C 0x5007 los registros son de tres bytes
+C 0x500c y detras hay ocho que no se leen aqui
+C 0x5012 los punteros a las piezas
+C 0x5013 el contador de cuadros
+C 0x5016 la tabla de sprites, en 0x3800+0x2000
+C 0x5019 el bit 1 del contador de cuadros
+C 0x501e o media pantalla mas alla
+C 0x5021 y el bit 2
+C 0x5025 y el bit 2 la sube otras 0xC0
+C 0x502f el desplazamiento de color, a A'
+C 0x5032 sin desplazar, directo
+C 0x5034 (0xE207)
+C 0x5037 el bit 4, que sale del menu
+C 0x503b y el bit 0
+C 0x5040 dos
+C 0x5045 una pieza mas
+C 0x5048 y si no, se salta el primer puntero
+C 0x504a pieza por pieza
+C 0x504b el puntero de la pieza
+C 0x504e y se pinta
+C 0x5052 palabras
+C 0x5055 el desplazamiento, otra vez
+C 0x5058 y se limpia para la siguiente
+C 0x505a pieza a pieza
+L 0x505d vuelca_un_guion_con_direccion
+C 0x505d aqui se fija la direccion de VRAM
+L 0x5060 vuelca_un_guion
+C 0x5060 el puerto de datos del VDP
+C 0x5064 el codigo: cuantos bytes
+C 0x5065 los siete de abajo
+C 0x5067 cero, se acabo
+C 0x5069 y el bit 7 dice como
+C 0x506a compara el byte crudo con la cuenta
+C 0x506b sin el, un byte repetido
+C 0x506d con el, bytes seguidos
+C 0x506e cada uno puede cambiar de color
+C 0x5073 byte a byte
+C 0x5078 el byte a repetir
+C 0x507c los dos `nop` dan tiempo al VDP entre escrituras
+C 0x5082 y a por el siguiente codigo
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x5085 ----------------------------------------------------------------------
+B 0x5085 Los sprites. La tabla de atributos esta en 0x3B00, pero aqui se escribe
+B 0x5085 como 0x7B00 porque SETWRT solo mira catorce bits. Cuatro bytes por
+B 0x5085 sprite: fila, columna, patron y color. El contador de cuadros reparte
+B 0x5085 el trabajo entre cuatro cuadros -bits 1 y 2-, asi que la tabla se
+B 0x5085 rehace por trozos y no entera.
+L 0x5085 pinta_los_sprites
+C 0x5085 (0xE278), donde se quedo pinta_una_figura
+C 0x5088 la palabra que dejo apuntada
+C 0x508b sin nada apuntado, no hay sprites
+C 0x508e a HL
+C 0x508f la cuenta de piezas
+C 0x5091 la tabla de atributos
+C 0x5094 el contador de cuadros
+C 0x5097 el bit 1
+C 0x5099 la parte baja
+C 0x509c el bit 1 mueve seis sprites mas alla
+C 0x50a1 el contador de cuadros
+C 0x50a4 y el bit 2, otros seis
+C 0x50ab el desplazamiento de color, a A'
+C 0x50af la columna de donde se pinta
+C 0x50b3 y ahi van los sprites
+C 0x50b7 (0xE274) o (0xE248)
+C 0x50bb la tabla de atributos, otra vez
+C 0x50be la columna del de la derecha
+C 0x50c1 el contador de cuadros
+C 0x50c4 el bit 1
+C 0x50c9 en los pares se cambia de sitio...
+C 0x50cb ...y de boxeador: el de la izquierda
+C 0x50d4 y el bit 2
+C 0x50d8 seis sprites mas alla
+C 0x50dd el contador de cuadros
+C 0x50e0 el bit 2
+C 0x50e4 seis sprites mas alla
+C 0x50e7 el desplazamiento de color
+C 0x50e8 y ahi van los del otro
+C 0x50ec el puntero de la figura
+C 0x50ef con la parte alta a cero no hay figura
+C 0x50f4 la cuenta de piezas
+C 0x50f5 y sus sprites
+C 0x50f8 (0xE22D)
+C 0x50fc con algo apuntado, las nueve tiras de 0x5254
+C 0x50fe fila 14, columna 17
+C 0x5101 dos casillas
+C 0x5104 en blanco
+C 0x510b fila 7, columna 3
+C 0x510e nueve tiras
+C 0x5110 las ternas de 0x5254
+C 0x5113 el puerto de datos del VDP
+C 0x5118 cuantas casillas
+C 0x511b y donde
+C 0x511e la misma casilla, repetida
+C 0x5124 el tercer byte dice cuanto se baja
+C 0x512c la campana y el arbitro
+C 0x5130 a DE
+C 0x5131 la cuenta del arbitro
+C 0x5134 (0xE274) o (0xE248)
+C 0x5137 el puntero
+C 0x513a nada que pintar
+C 0x513d la cuenta de piezas
+C 0x513e el contador de cuadros
+C 0x5141 el bit 1, al acarreo
+C 0x5143 uno de cada cuatro...
+C 0x5145 ...lleva una pieza mas
+C 0x5147 los registros son de tres bytes
+C 0x514c a DE
+C 0x514d el contador de cuadros
+C 0x5150 de 0 a 7
+C 0x5153 entre dos: de 0 a 3
+C 0x5155 los cuatro de 0x52C4
+C 0x515b y ese es el patron de partida
+C 0x515d la columna apuntada en (0xE271)
+L 0x5164 no_habia_figura
+C 0x5164 la pila, en su sitio
+L 0x5166 mira_si_toca_otra_cosa
+C 0x5166 (0xE22D)
+C 0x516a con algo apuntado, nada
+C 0x516b (0xE210)
+C 0x516f a cero, nada
+C 0x5170 y (0xE27F)
+C 0x5174 a cero, el sonido de la campana
+B 0x5178 ----------------------------------------------------------------------
+B 0x5178 Los cuatro bytes de cada sprite, seguidos por el puerto de datos: a la
+B 0x5178 fila se le suma 0x3F, a la columna la del boxeador, el patron va en A'
+B 0x5178 y sube de cuatro en cuatro, y el color sale del tercer byte del
+B 0x5178 registro. Los sprites que sobran se aparcan en la fila 0xCF.
+L 0x5178 monta_los_sprites_de_una_figura
+C 0x5178 al otro juego de registros
+C 0x5179 el desplazamiento de color
+C 0x517a el desplazamiento, a L
+C 0x517b los tres de arriba
+C 0x517e y de vuelta a A
+C 0x517f sin paso entre registros
+C 0x5182 el desplazamiento, de vuelta a A'
+C 0x5185 sin desplazar, directo
+C 0x5187 (0xE207), que sale del menu
+C 0x518a el bit 4, que sale del menu
+C 0x518e y el bit 0
+C 0x5193 tres
+C 0x5198 un sprite mas
+C 0x519b y si no, se salta el primer registro
+C 0x519e seis sprites en total...
+C 0x51a0 ...menos los que se van a pintar
+C 0x51a2 el puerto de datos del VDP
+C 0x51a6 la fila del registro
+C 0x51a7 la fila, con 0x3F de margen
+C 0x51aa y al puerto
+C 0x51ac el byte siguiente del registro
+C 0x51ad la columna del boxeador...
+C 0x51ae ...mas la del registro
+C 0x51b1 el patron, que va en A'
+C 0x51b5 cada sprite se come cuatro patrones
+C 0x51ba por debajo del patron 0x30, el color tal cual
+C 0x51be (0xE207)
+C 0x51c9 el color 4...
+C 0x51cc ...se cambia por el 0x0C
+C 0x51d1 y ese es el color
+C 0x51d3 al otro juego
+C 0x51d4 el paso entre registros
+C 0x51d8 al registro siguiente
+C 0x51db sprite a sprite
+C 0x51dd y uno mas al acabar
+C 0x51de los que sobran
+C 0x51e0 ninguno, se acabo
+C 0x51e2 la fila 0xCF, que esta fuera de la pantalla
+C 0x51e4 cuatro bytes por sprite...
+C 0x51f0 ...y el resto, aparcados
+L 0x51f3 elige_el_bloque_de_registros
+C 0x51f3 (0xE274)
+C 0x51f6 el contador de cuadros
+C 0x51fb uno de cada cuatro se queda con ese...
+C 0x51fc ...y los demas con (0xE248)
+L 0x51ff prepara_la_cuenta
+C 0x51ff al otro juego de registros
+C 0x5200 el contador de cuadros
+C 0x5203 de 0 a 7
+C 0x5205 entre dos
+C 0x5207 los cuatro de 0x52C5
+C 0x520d el patron de partida
+C 0x520f y la columna de (0xE27D)
+C 0x5213 la tabla de nombres, fila 8
+C 0x5215 el puerto de datos del VDP
+C 0x521b ocho filas
+C 0x521f el nibble alto: donde empieza
+C 0x5226 de 8 en adelante, esa fila se salta
+C 0x522a la columna
+C 0x522f el nibble bajo: cuantas casillas
+C 0x5233 esas van al patron
+C 0x5234 el patron
+C 0x5235 correlativas
+C 0x523a y sigue por donde iba
+C 0x523c la casilla siguiente
+C 0x523e la fila de abajo
+C 0x5243 ocho veces
+L 0x5246 saca_la_palabra
+C 0x5246 (HL) a HL, que es lo que hacen todas las tablas de punteros
+B 0x526f ----------------------------------------------------------------------
+B 0x526f El cambio de color, que solo entra con (0xE207) puesto de cierta manera
+B 0x526f y en la mitad de los cuadros: el color 4 pasa a 0x0C, tinta y fondo.
+L 0x526f saca_el_byte_con_el_color_cambiado
+C 0x526f el contador de cuadros
+C 0x5272 el bit 1
+C 0x5276 (0xE207)
+C 0x5279 el bit 4
+C 0x527d los dos de abajo
+C 0x527f con el 2 exacto se cambia
+C 0x5283 el byte
+C 0x5284 el fondo
+C 0x5287 el 4...
+C 0x528b ...pasa a 0x0C
+C 0x528d y la tinta
+C 0x5290 el 4...
+C 0x5294 ...pasa a 0x0C
+C 0x5296 y se juntan
+L 0x5298 saca_el_byte_tal_cual
+C 0x5298 el byte, sin tocar
+L 0x529a vuelca_un_guion_de_pieza_con_direccion
+C 0x529a aqui se fija la direccion de VRAM
+L 0x529d vuelca_un_guion_de_pieza
+C 0x529d el puerto de datos del VDP
+C 0x52a1 el codigo: cuantos bytes
+C 0x52a2 los siete de abajo
+C 0x52a4 cero, se acabo
+C 0x52a6 y el bit 7 dice como
+C 0x52a8 el bit 7, al acarreo
+C 0x52a9 con el puesto, bytes seguidos
+C 0x52ab sin el, la misma repetida
+C 0x52b0 el byte a repetir
+C 0x52b3 `outi` va con HL, asi que se cambian
+C 0x52b4 dos bytes por vuelta
+C 0x52b9 y se devuelven
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x52cf ======================================================================
+B 0x52cf LA CAMPANA, EL ARBITRO Y LAS BARRAS DE CASTIGO
+B 0x52cf ======================================================================
+L 0x52cf toca_la_campana
+C 0x52cf (0xE283), la marca de que ya sono
+C 0x52d3 sin poner todavia?
+C 0x52d4 con ella puesta, se sigue con lo de despues
+C 0x52d6 (0xE210)
+C 0x52dc y (0xE27F)
+C 0x52e0 a cero, todavia no
+C 0x52e1 (0xE1FF)
+C 0x52e5 con algo, tampoco
+C 0x52e6 y con un sonido sonando...
+C 0x52ea ...se espera a que acabe
+C 0x52eb la marca, puesta
+C 0x52ed sesenta cuadros a los dos boxeadores
+C 0x52f5 y un 4 en (0xE26D)
+C 0x52fa y un 1 en (0xE12B)
+L 0x5300 ya_sono_la_campana
+C 0x5300 (0xE25A), el temporizador del de la izquierda
+C 0x5303 por debajo de 0x10...
+C 0x5307 ...se apunta un 1 en (0xE22D)
+C 0x530c con alguien en el suelo, nada
+C 0x5311 el contador de cuadros
+C 0x5314 uno de cada 16
+C 0x5317 (0xE26D)
+C 0x531a a cero...
+C 0x531e ...se pone a 4
+C 0x5321 y si vale 4...
+C 0x5324 ...sube a 5
+L 0x5326 pinta_al_arbitro
+C 0x5326 el contador de cuadros
+C 0x5329 uno de cada 32
+C 0x532c (0xE140), que alterna entre 0 y 1
+C 0x5330 y cambia
+C 0x5333 y solo con el sonido 0x53 sonando, que es el de la cuenta
+C 0x5339 (0xE211)
+C 0x533c su bit 0
+C 0x533f el contador de cuadros
+C 0x5342 el bit 6 reparte los dos dibujos
+C 0x5345 uno de cada dos, al otro lado
+C 0x534c (0xE258), el de la izquierda
+C 0x5350 sin tocar, se mira el otro
+C 0x5352 fila 1, columna 16
+C 0x5355 el guion por filas de 0x680C
+C 0x535b (0xE140) elige uno de los dos guiones cortos
+C 0x5361 fila 4, columna 18
+C 0x5367 y el otro va con el contrario
+C 0x536f fila 3, columna 25
+L 0x5375 mira_al_de_la_derecha
+C 0x5375 (0xE235)
+C 0x5379 sin tocar, nada
+L 0x537a pinta_al_arbitro_al_otro_lado
+C 0x537a el otro dibujo grande
+C 0x537d (0xE140), igual que arriba
+C 0x5383 fila 4, columna 9
+C 0x5389 y el contrario
+C 0x5391 fila 3, columna 2
+L 0x5397 el_arbitro_a_la_izquierda
+C 0x5397 fila 1, columna 0
+C 0x539a el guion por filas de 0x67C8
+C 0x539d sin desplazar
+C 0x539f el sonido que suena
+C 0x53a2 con el sonido de la cuenta...
+C 0x53a6 el contador de cuadros
+C 0x53a9 y su bit 5
+C 0x53ad ...las casillas se desplazan 0x2A
+C 0x53af el puerto de datos del VDP
+C 0x53b3 una fila mas abajo
+C 0x53bb la casilla
+C 0x53bc 0x00 acaba
+C 0x53bf 0xFF baja una fila
+C 0x53c3 y las demas van con su desplazamiento
+L 0x53c8 elige_guion_corto
+C 0x53c8 (0xE140)
+C 0x53c9 palabras
+C 0x53ca los dos punteros de 0x53D5
+C 0x53d3 y el guion, a DE
+B 0x53e6 ----------------------------------------------------------------------
+B 0x53e6 El castigo de cada boxeador son DOS bytes: el nivel, de 0 a 8, y lo que
+B 0x53e6 lleva acumulado dentro del nivel. Se sube de nivel al pasar el tope, y
+B 0x53e6 el tope sale de 0x5445: 0x10 por debajo del nivel 5, y 0x1A, 0x14 y
+B 0x53e6 0x10 en los niveles 5, 6 y 7. Con B negativo -0xFF- se recupera.
+L 0x53e6 aplica_los_golpes_encajados
+C 0x53e6 (0xE216), lo que le entro al de la derecha
+C 0x53ea y se vacia
+C 0x53ec su castigo esta en (0xE218)
+C 0x53f1 (0xE217), lo del de la izquierda
+C 0x53f7 y el suyo en (0xE21A)
+L 0x53f9 suma_castigo
+C 0x53f9 sin tocar DE ni HL
+L 0x5401 suma_castigo_de_verdad
+C 0x5401 el nivel
+C 0x5402 el 8 es el tope, y no se pasa de ahi
+C 0x5405 por debajo del 5...
+C 0x5407 ...el tope es 0x10
+C 0x540b y del 5 al 7 sale de la tabla
+C 0x5417 el tope, a C
+C 0x5418 lo acumulado
+C 0x5419 mas lo que entra
+C 0x541c si no se ha ido por debajo de cero
+C 0x541f el nivel
+C 0x5421 ya a cero, no baja mas
+C 0x5423 y si no, un nivel menos
+C 0x5424 con su tope
+C 0x5427 por debajo del 5, el 0x10 de siempre
+C 0x5435 lo acumulado
+C 0x5436 lo que sobraba, en negativo
+C 0x543a y se cuenta desde el tope del nivel de abajo
+C 0x543e lo acumulado
+C 0x543f llega al tope?
+C 0x5440 no, y ahi se queda
+C 0x5441 si: se le quita el tope...
+C 0x5443 ...y sube un nivel
+B 0x5448 ----------------------------------------------------------------------
+B 0x5448 Las dos barras de castigo son UNA sola tira de 22 casillas en la fila
+B 0x5448 22, columna 5: la del de la izquierda se come casillas desde el
+B 0x5448 principio y la del de la derecha desde el final. La tira se monta en
+B 0x5448 0xE2B0 y se vuelca de una vez.
+L 0x5448 pinta_las_barras
+C 0x5448 las 22 casillas de 0x54A1...
+C 0x544b ...a 0xE2B0
+C 0x5454 desde el principio
+C 0x5457 casilla 0x62, de una en una
+C 0x545a el castigo del de la izquierda
+C 0x545d y su parpadeo en 0xE2B6
+C 0x5463 y ahora desde el final
+C 0x5465 casilla 0x63, hacia atras
+C 0x5468 el castigo del de la derecha
+C 0x546b y el suyo en 0xE2BE
+C 0x5471 fila 22, columna 5
+C 0x5474 las 22
+L 0x547a come_casillas_de_la_barra
+C 0x547a sin castigo, entera
+C 0x547c del nivel 8...
+C 0x5480 ...no se pasa
+C 0x5483 por debajo del 6, sin parpadeo
+C 0x5489 el contador de cuadros
+C 0x548c y su bit 4 lo hace parpadear
+C 0x5490 dos casillas mas alla
+C 0x5493 las dos que avisan
+C 0x5498 tantas casillas como el nivel
+C 0x5499 borradas
+C 0x549b y de una en una o hacia atras, segun C
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x54b7 ======================================================================
+B 0x54b7 MONTAR LA PANTALLA DE COMBATE
+B 0x54b7 ======================================================================
+L 0x54b7 pinta_al_de_la_izquierda
+C 0x54b7 el contador de cuadros
+C 0x54ba uno de cada dos
+C 0x54bd su columna...
+C 0x54c0 ...a (0xE271)
+C 0x54c3 los cuatro de 0xE274...
+C 0x54c6 ...a 0xE278
+C 0x54d1 y su accion, columna y pixel
+C 0x54d7 tres bytes
+C 0x54dc a la zona de trabajo
+C 0x54de y ahi se pinta
+C 0x54e4 lo de antes, de vuelta
+C 0x54e9 y los otros cuatro tambien
+L 0x54ec pinta_una_pieza_con_direccion
+C 0x54ec aqui se fija la direccion de VRAM
+L 0x54f1 pinta_una_pieza
+C 0x54f2 32 bytes por pieza
+C 0x54f4 el puerto de datos del VDP
+C 0x54f8 el byte
+C 0x54f9 el cero es la marca de hueco
+C 0x54fc y los demas van tal cual
+C 0x54fe byte a byte
+C 0x5503 el byte siguiente dice cuantos
+C 0x5506 tantos ceros
+C 0x5508 el hueco cuenta como bytes escritos
+C 0x5509 hasta acabar el hueco
+L 0x550e pinta_la_campana
+C 0x550e (0xE26E)
+C 0x5512 con algo, nada
+C 0x5514 (0xE26D)
+C 0x5516 el 5...
+C 0x551b ...pone el bit 0 de (0xE26E)
+C 0x551e palabras
+C 0x5520 las parejas de 0x68A8
+C 0x5526 los dos bytes...
+C 0x552a ...a DE
+C 0x552c (0xE26C) dice donde
+C 0x552e fila 0 de la tabla de nombres
+C 0x5530 el puerto de datos del VDP
+C 0x5534 siete filas
+C 0x553a de seis casillas
+C 0x5542 y una fila mas abajo
+B 0x554b ----------------------------------------------------------------------
+B 0x554b El cuadrilatero entero, con la pantalla apagada. Los guiones se
+B 0x554b encadenan: unos siguen donde acabo el anterior con
+B 0x554b sigue_descomprimiendo, que es lo que hace que la cola se comparta.
+L 0x554b monta_el_combate
+C 0x554b R1 sin el bit 6: la pantalla, apagada
+C 0x5551 patrones, casilla 0x30
+C 0x5554 la fuente
+C 0x555a el borde
+C 0x5560 y lo que sigue
+C 0x5566 el guion gordo del cuadrilatero
+C 0x556c que sigue por donde acabo
+C 0x5572 patrones
+C 0x5575 la cola de 0x6632
+C 0x557b y lo que sigue
+C 0x5581 (0xE207), el rival
+C 0x5584 con el bit 4 puesto...
+C 0x5588 ...tres mas
+C 0x558a de 0 a 15
+C 0x558c palabras
+C 0x558d los seis punteros de 0x5661
+C 0x5593 su nombre
+C 0x5597 fila 1, columna 2
+C 0x559d fila 1, columna 23
+C 0x55a0 y "RYU", el del jugador
+C 0x55a6 el guion de 0x6710
+C 0x55a9 fila 2, columna 16
+C 0x55af el reparto de colores
+C 0x55b2 (0xE208)
+C 0x55b5 fila 18, columna 26
+C 0x55bb y el asalto al lado
+C 0x55be (0xE21C), lo que lleva sumado el de la izquierda
+C 0x55c1 fila 20, columna 26
+C 0x55c7 y (0xE21D), el de la derecha
+C 0x55ca fila 20, columna 9
+C 0x55d0 (0xE202), el tope de golpes
+C 0x55d3 tres...
+C 0x55d5 (0xE206), lo duro que juega
+C 0x55d8 por debajo de 7...
+C 0x55dc ...dos, y por debajo de 0x0F...
+C 0x55e1 ...uno
+L 0x55e3 borra_la_zona_de_trabajo
+C 0x55e3 de 0xE21E a 0xE2EE
+C 0x55ec y un 3 en (0xE1FF)
+C 0x55f1 columna 2, pixel 40 para el de la izquierda
+C 0x55f7 columna 22, pixel 200 para el de la derecha
+C 0x55fd fila 0 en (0xE26C), donde empieza la campana
+C 0x5602 (0xE210), el asalto
+C 0x5605 uno mas, en ASCII
+C 0x5608 fila 18, columna 10
+C 0x560e los cinco de 0x561F...
+C 0x5611 ...a 0xE211
+C 0x5619 y R1 otra vez con el bit 6: se enciende
+B 0x5624 ----------------------------------------------------------------------
+B 0x5624 El mismo guion comprimido de siempre, pero pasando cada byte por un
+B 0x5624 cambio de color: el 6 se convierte en 9, en la tinta y en el fondo.
+L 0x5624 descomprime_cambiando_el_color
+C 0x5624 aqui se fija la direccion
+C 0x5627 el puerto de datos del VDP
+C 0x562b el codigo
+C 0x562c los siete de abajo
+C 0x562e cero, se acabo
+C 0x5630 y el byte entero
+C 0x5631 con el bit 7 puesto, bytes seguidos
+C 0x5634 byte a byte
+C 0x5635 cada uno con su cambio de color
+C 0x5638 y al puerto
+C 0x563f y si no, el mismo repetido
+C 0x5643 los dos `nop` dan tiempo al VDP
+C 0x5645 y al puerto
+C 0x5649 y a por el siguiente codigo
+L 0x564c cambia_el_color_6_por_el_9
+C 0x564c el byte
+C 0x564d el fondo
+C 0x5650 el 6...
+C 0x5654 ...pasa a 9
+C 0x5656 y la tinta
+C 0x5659 el 6...
+C 0x565d ...pasa a 9
+C 0x565f y se juntan
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x56b4 ======================================================================
+B 0x56b4 EL RELOJ, LA CUENTA Y EL FINAL DEL ASALTO
+B 0x56b4 ======================================================================
+B 0x56b4 El reloj del asalto son CUATRO casillas en ASCII, de (0xE212) a
+B 0x56b4 (0xE215), volcadas a la fila 1 columna 14. Baja de una en una por el
+B 0x56b4 final, y cuando las unidades pasan de '0' a '9' se lleva una de las
+B 0x56b4 decenas, que al pasar de '0' vuelven a '5': o sea segundos de verdad.
+L 0x56b4 apaga_la_campana
+C 0x56b4 con nadie en el suelo, nada
+C 0x56b9 el contador de cuadros
+C 0x56bc uno de cada 16
+C 0x56bf y se quita el bit 1 de (0xE26D)
+L 0x56c5 lleva_el_asalto
+C 0x56c5 los sprites del jugador
+C 0x56c8 (0xE211)
+C 0x56cb su bit 0
+C 0x56cc (0xE1FF), el paso en que va
+C 0x56cf con el bit puesto, otra cosa
+C 0x56d2 y con el paso empezado, tampoco
+C 0x56d5 el paso 1
+C 0x56d9 y a mirar quien esta en el suelo
+C 0x56da (0xE22C), el que cuenta la caida
+C 0x56de a cero, nadie en el suelo
+C 0x56e1 el 4...
+C 0x56e5 ...y (0xE23E) o (0xE261) a 3
+C 0x56ec o (0xE261)
+C 0x56f3 de 0x0B en adelante...
+C 0x56f7 ...se salta al 0x0C, que acaba la cuenta
+C 0x56fb la accion del de la izquierda
+C 0x56fe la 0x10, caer
+C 0x5702 o la 0x0D
+C 0x5706 y la del de la derecha
+C 0x5711 un 5 en (0xE26D)
+C 0x5716 (0xE24B) a cero
+C 0x571a y suena la campana
+C 0x571f (0xE24F)
+C 0x5723 con algo, no se cuenta
+C 0x5725 el numero de la cuenta
+C 0x5727 los diez de 0x5950
+C 0x572d el sonido que le toca
+C 0x5731 y uno mas
+C 0x5732 con el bit 1 de (0xE26D) puesto
+L 0x5737 baja_los_temporizadores
+C 0x5738 (0xE258), el del de la izquierda
+C 0x573b ya a cero?
+C 0x573e no: uno menos
+C 0x573f (0xE211)
+C 0x5742 con su bit 1, nada mas
+C 0x5747 y entonces (0xE257)
+C 0x5749 con algo, se acaba aqui
+C 0x574b (0xE235), el del de la derecha
+C 0x574e ya a cero?
+C 0x5751 uno menos
+C 0x5752 (0xE211)
+C 0x5755 con su bit 1, nada mas
+C 0x575a y entonces (0xE234)
+C 0x575c con algo, se acaba aqui
+L 0x575e baja_el_reloj
+C 0x575e las tarjetas, al dia
+C 0x5761 (0xE211)
+C 0x5764 con su bit 1, el reloj no corre
+C 0x5768 las unidades de segundo
+C 0x576c la cifra
+C 0x576e una menos...
+C 0x5771 ...en BCD
+C 0x5773 y de vuelta a ASCII
+C 0x5776 si quedo en '0', puede que se acabe
+C 0x577a y si dio la vuelta a '9'...
+C 0x577e ...se lleva una de las decenas
+C 0x5782 una menos
+C 0x5784 mientras no den la vuelta, se sigue
+C 0x5786 y al pasar de '0' vuelven a '5': sesenta segundos
+C 0x578d (0xE212), los minutos
+C 0x5790 a '0' no quedan mas
+C 0x5794 las decenas
+C 0x5795 y a los minutos
+C 0x5797 y un minuto menos
+C 0x5798 las cuatro casillas...
+C 0x579b ...de 0xE212...
+C 0x579e ...a la fila 1, columna 14
+L 0x57a4 mira_si_se_acabo_el_tiempo
+C 0x57a4 las decenas...
+C 0x57a5 ...tambien a '0'?
+C 0x57a8 y los minutos
+C 0x57aa ...tambien?
+C 0x57ad se pinta el 0:00
+L 0x57b0 acaba_el_asalto
+C 0x57b0 (0xE210), el asalto
+C 0x57b3 su bit 1
+C 0x57b6 ya estaba puesto
+C 0x57b8 se pone en (0xE211)
+C 0x57ba (0xE258)...
+C 0x57bf ...y (0xE235) a cero
+C 0x57c4 el bit 0 de (0xE211)
+C 0x57c7 y un asalto mas
+C 0x57c8 se puntua
+C 0x57cb el paso 8
+C 0x57d0 y un 1 en (0xE12B)
+L 0x57d8 pon_la_accion_0x12
+C 0x57d8 la accion 0x12 al que toque
+L 0x57da suena_la_campana
+C 0x57da en (0xE26D)
+C 0x57de y (0xE26E) a cero
+L 0x57e3 espera_al_sonido
+C 0x57e3 el sonido que suena
+C 0x57e6 el 0x1F...
+C 0x57ea ...con (0xE311) a 0x20
+C 0x57f1 (0xE24E)
+C 0x57f7 mientras corra, nada
+C 0x57f9 y al acabar, un 1 en (0xE12B)
+L 0x57fe mira_quien_esta_en_el_suelo
+C 0x57fe la accion del de la derecha
+C 0x5801 la 0x10, caer
+C 0x5804 y la del de la izquierda
+C 0x580a (0xE284), que solo entra una vez
+C 0x5811 y se echa el cerrojo
+C 0x5812 (0xE257), el de la izquierda
+C 0x5816 tocado, el 2
+C 0x581a (0xE234), el de la derecha
+C 0x581e tocado, el 3
+C 0x5822 (0xE210), el asalto
+C 0x5825 solo en el tercero
+C 0x5829 la campana, a la fila 0
+C 0x582e (0xE21C) contra (0xE21D)
+C 0x5833 columna 5, pixel 64
+C 0x5836 para el de la izquierda
+C 0x5839 y la accion del de la derecha
+C 0x583c y la 3
+C 0x583e gana el de la derecha
+C 0x5840 columna 19, pixel 176
+C 0x5843 para el de la derecha
+C 0x5846 y la accion del de la izquierda
+C 0x584b gana el de la izquierda
+C 0x584d empate
+L 0x5850 pon_el_sonido_final
+C 0x5850 (0xE280), lo ultimo que sono
+C 0x5854 el 0x53 ya esta puesto
+C 0x5858 con algo sonando, se espera
+C 0x585d y con (0xE12B) tambien
+C 0x5862 el 0x53, la cuenta
+C 0x5868 (0xE234)...
+C 0x586e ...o (0xE257)
+C 0x5874 (0xE210), el asalto
+C 0x5877 el tercero
+L 0x587b para_a_los_dos
+C 0x587b en (0xE270)
+C 0x587e la accion del de la derecha
+C 0x5882 la 0x12...
+C 0x5886 ...o la 0x0D se dejan
+C 0x588a y a las demas, la 0x11
+C 0x588c la del de la izquierda
+C 0x5898 igual
+L 0x589a elige_la_escena_siguiente
+C 0x589a (0xE1FF)
+C 0x589e con algo, solo el marcador
+C 0x58a1 (0xE22C)
+C 0x58a4 la campana
+C 0x58a7 y las tarjetas, en blanco
+C 0x58aa la escena de ahora
+C 0x58ad la 2, la demostracion...
+C 0x58af ...vuelve a la 7
+C 0x58b3 (0xE234), el de la derecha
+C 0x58b7 tocado, la 6
+C 0x58bb (0xE257), el de la izquierda
+C 0x58c1 (0xE210), el asalto
+C 0x58c4 antes del tercero...
+C 0x58c6 ...la 0x0A
+C 0x58ca y en el tercero, a cero
+C 0x58ce (0xE21C) contra (0xE21D)
+C 0x58d4 el que menos puntos lleva, la 6
+C 0x58d8 el bit 0 de las banderas: con dos jugando...
+C 0x58de ...la 8
+C 0x58e0 y esa es la escena
+C 0x58e4 la 8
+C 0x58e8 (0xE207), el rival
+C 0x58eb los dos de abajo
+C 0x58ed solo con el 2
+C 0x58f0 (0xE257)
+C 0x58f6 los tres sprites, al color 0x58
+C 0x58f9 (0xE102), la fila del primero
+C 0x58fd a 0xB4 no se baja mas
+C 0x5901 doce
+C 0x5904 a 0x9C...
+C 0x5908 ...seis
+C 0x590a en (0xE103)
+C 0x590c la fila...
+C 0x590d ...doce pixeles mas abajo
+C 0x5910 y el registro siguiente
+C 0x5916 el sonido 0xA5
+C 0x591a la escena 6...
+C 0x591d ...suena el 0xA8
+L 0x5922 suena_la_campana_y_pinta
+C 0x5922 el sonido 0x56
+L 0x5927 pon_la_cuenta_a_doce
+C 0x5927 un 0x0C en (0xE22C)
+L 0x592c pinta_al_arbitro_en_medio
+C 0x592c fila 1, columna 16
+C 0x592f el guion por filas de 0x680C
+C 0x5935 y el otro a la izquierda
+L 0x5938 pinta_los_tres_sprites
+C 0x5938 el color 0x58
+C 0x593a los tres registros de 0xE100
+C 0x593e tres
+C 0x5940 el color, en su sitio
+C 0x5941 cuatro bytes por registro
+C 0x5947 la tabla de sprites, sprite 12
+C 0x594b doce bytes
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x695a ======================================================================
+B 0x695a EL MOTOR DE SONIDO
+B 0x695a ======================================================================
+B 0x695a Tres voces, cada una con su bloque de CATORCE bytes desde 0xE311:
+B 0x695a +0 el contador de la nota    +1 la duracion de base
+B 0x695a +2 el numero de sonido, que hace de estado y de prioridad
+B 0x695a +3 y +4 el puntero del guion +5 la octava    +6 el sostenido
+B 0x695a +7 el volumen de ahora       +8 el contador de la bajada
+B 0x695a +9 las vueltas dadas         +0x0A el paso del volumen
+B 0x695a +0x0B lo que queda de ataque +0x0C el desafine
+B 0x695a De ahi que (0xE313) sea el estado de la primera voz -lo que consulta
+B 0x695a la escena 6 para esperar a que se calle- y (0xE32F) el de la tercera.
+B 0x695a Cuantas voces se reparten depende del numero: por debajo del 7 solo la
+B 0x695a tercera, del 7 al 0x12 dos, y del 0x13 en adelante las tres.
+L 0x695a pide_un_sonido
+C 0x695a mientras se monta, sin interrupciones
+C 0x695c la escena
+C 0x695f en la 2, la demostracion, no suena nada
+L 0x6967 pide_un_sonido_aunque_sea_la_demo
+C 0x696a el numero de sonido
+C 0x696b dos voces
+C 0x696d el estado de la primera voz
+C 0x6970 seis bits
+C 0x6972 por debajo del 7...
+C 0x6976 del 7 al 0x12, dos voces
+C 0x697a y el 0x13 se apunta aparte
+C 0x697d del 0x13 en adelante, tres
+C 0x6980 ...una sola voz
+C 0x6981 la tercera
+C 0x6985 el estado de la primera
+C 0x6986 seis bits
+C 0x6989 el 0x16 exacto...
+C 0x698d ...con el 0x13 pedido se deja
+C 0x6992 y si no, la tercera se calla
+C 0x6996 y suena el pedido
+C 0x699b el pedido
+C 0x699e contra el que suena
+C 0x699f con menos numero no se cuela: el numero es la prioridad
+C 0x69a1 palabras
+C 0x69a2 la tabla de guiones de 0x6BBC
+C 0x69a8 al principio del bloque de la voz
+C 0x69aa el contador, a uno
+C 0x69ad y la duracion tambien
+C 0x69b0 el numero, que queda de estado
+C 0x69b2 el puntero del guion
+C 0x69b8 cinco bytes mas alla
+C 0x69be las vueltas del repetidor, a cero
+C 0x69c4 las voces de un sonido van seguidas en la tabla
+C 0x69c5 una, dos o tres
+B 0x69cc ----------------------------------------------------------------------
+B 0x69cc El 0xFE del guion: repetir un trozo.
+L 0x69cc repite_un_trozo
+C 0x69cd cuantas vueltas lleva
+C 0x69d1 contra las que pide el guion
+C 0x69d2 si ya estan hechas, se sigue de largo
+C 0x69d4 el 0x00 quiere decir para siempre
+C 0x69db y si no, se vuelve a la direccion que trae el guion
+C 0x69e7 dos bytes de la orden
+C 0x69ea la cuenta se reinicia
+C 0x69f0 una nota mas
+B 0x69f5 ----------------------------------------------------------------------
+B 0x69f5 El mezclador. OJO: los bits que toca son el 3, el 4 y el 5, o sea los
+B 0x69f5 del RUIDO, no los del tono. El tono de las tres voces se deja abierto
+B 0x69f5 en el arranque (0x4401 escribe 0xB8 en el registro 7) y no se vuelve a
+B 0x69f5 tocar: para callar una voz se le baja el volumen, no se cierra aqui.
+B 0x69f5 Y el sentido de D es el contrario del que parece: el registro 7 del PSG
+B 0x69f5 va al reves, asi que con D=1 el bit se PONE y el ruido se APAGA.
+L 0x69f5 enciende_o_apaga_el_ruido
+C 0x69f5 la copia del registro 7
+C 0x69f9 c es 1, 3 o 5: la voz
+C 0x69ff tres rotaciones dejan 0x08, 0x10 o 0x20, los bits de ruido
+C 0x6a02 con D a uno...
+C 0x6a05 el bit se quita y el ruido suena
+C 0x6a09 ...el bit se pone y el ruido calla
+C 0x6a0e el registro 7 del PSG es el mezclador
+L 0x6a0a escribe_el_mezclador
+B 0x6a13 ----------------------------------------------------------------------
+L 0x6a13 suena_el_cuadro
+C 0x6a13 primero el mezclador, tal como quedo
+C 0x6a19 la voz A, que en el PSG es el registro 1
+C 0x6a1b y su bloque de catorce bytes
+C 0x6a20 tres voces
+C 0x6a22 catorce bytes de una a otra
+C 0x6a26 si la voz esta callada...
+C 0x6a2c ...se apaga
+C 0x6a31 y si no, suena
+C 0x6a34 c va 1, 3, 5: son los registros de periodo de las tres voces
+C 0x6a37 y ix salta al siguiente bloque
+L 0x6a3c calla_el_ruido_si_lo_pide_el_estado
+C 0x6a3c el bit 6 del estado
+C 0x6a3e apagar
+L 0x6a43 sigue_el_guion
+C 0x6a43 el estado de la voz
+C 0x6a47 con el bit 7 puesto, la envolvente
+C 0x6a4a el 0x1F espera...
+C 0x6a4e ...a que el cuadro anterior haya salido
+C 0x6a53 la nota sigue sonando: solo baja el contador
+L 0x6a57 paso_del_guion
+C 0x6a57 el puntero del guion
+C 0x6a5d el byte
+C 0x6a5e 0xFE: repetir un trozo
+C 0x6a63 0xFF: se acabo la voz
+C 0x6a66 con el bit 7 puesto, lo que viene es una orden larga
+C 0x6a6d el 0x20 monta la envolvente del PSG
+C 0x6a72 un cuadro de ataque
+C 0x6a77 el registro 12, la parte alta del periodo
+C 0x6a7f el 11, la baja
+C 0x6a87 y el 13, la forma
+C 0x6a91 y detras, la duracion
+C 0x6a97 el nibble alto
+C 0x6a99 el 0x2n cambia la duracion de base
+C 0x6a9e la nueva duracion
+C 0x6aa0 en +1
+C 0x6aa3 y sigue el byte de despues
+C 0x6aa5 el byte, guardado
+C 0x6aa6 el nibble alto
+C 0x6aa8 0x1n: el ruido
+C 0x6aac su periodo
+C 0x6aaf por dos
+C 0x6ab1 el registro 6 del PSG es el periodo del ruido
+C 0x6ab6 encender
+C 0x6ab8 y la voz entra en el mezclador
+C 0x6abc y sigue el byte de despues
+C 0x6abd el cero es un silencio
+C 0x6ac0 todo a cero
+C 0x6ac5 el nibble alto es el semitono
+C 0x6ac8 lo que queda es el desplazamiento
+C 0x6acb y detras va el segundo byte de la nota
+C 0x6acc el guion avanza
+C 0x6ad0 se escribe el periodo en el PSG
+C 0x6ad3 el nibble alto de la nota
+C 0x6ad4 el nibble bajo, bajado
+C 0x6ad8 lo que queda de ataque
+C 0x6add al acabarlo, 0x10 mas de volumen
+C 0x6ae2 el volumen, sin mas
+C 0x6ae3 la duracion de base
+C 0x6ae9 y tres mas para la bajada
+L 0x6af1 calla_la_voz
+C 0x6af1 apagar el ruido
+C 0x6af6 y a cero todo
+C 0x6af7 el estado, a cero
+C 0x6afa y las dos cuentas tambien
+C 0x6b00 volumen cero
+L 0x6b03 envolvente
+C 0x6b03 la nota se acaba
+C 0x6b06 al llegar a cero, el guion sigue
+C 0x6b09 el volumen baja
+C 0x6b0f hasta el sostenido
+C 0x6b14 por debajo de 3 ya no
+C 0x6b19 uno mas, que va al doble
+C 0x6b1c el volumen de ahora
+C 0x6b1f uno menos cada vez
+C 0x6b20 y por debajo de cero, nada
+L 0x6b25 escribe_el_volumen
+C 0x6b25 c es 1, 3 o 5
+C 0x6b26 una rotacion y sumar 0x88 los convierte en los registros 8, 9 y 10, que son los tres volumenes: un truco para no llevar tabla
+C 0x6b29 el volumen, en E
+B 0x6b2d ----------------------------------------------------------------------
+B 0x6b2d Las ordenes largas, todas con el bit 7 puesto y encadenables: 0xDn el
+B 0x6b2d paso del volumen, 0xFn el sostenido, 0xEn la octava o el desafine, y
+B 0x6b2d detras las veces que se suma el paso.
+L 0x6b2d orden_larga
+C 0x6b2d el byte
+C 0x6b2e el nibble alto
+C 0x6b30 0xDn fija el paso del volumen
+C 0x6b37 en +0x0A
+C 0x6b3b y sigue
+C 0x6b3c 0xFn, el sostenido
+C 0x6b42 en +6
+C 0x6b47 0xEn
+C 0x6b4d con el bit 3, el desafine...
+C 0x6b51 ...en +0x0C, y se vuelve a mirar
+C 0x6b57 y sin el, la octava
+C 0x6b5c y lo que queda es cuantas veces se suma el paso del volumen
+C 0x6b5f el paso
+C 0x6b62 ninguna vez, el paso tal cual
+C 0x6b64 de ahi sale el volumen de arranque
+C 0x6b69 en +1
+C 0x6b6c y detras, ya, la nota
+C 0x6b6d el guion avanza
+C 0x6b70 el nibble alto: el semitono
+C 0x6b76 guardado
+C 0x6b77 el semitono 0x0C deja el volumen a cero: es el silencio
+C 0x6b7b y si no, el sostenido
+C 0x6b7e el volumen de arranque
+C 0x6b81 y a sonar
+C 0x6b84 el semitono
+C 0x6b85 la tabla de periodos de 0x6BB2
+C 0x6b8b el periodo de esa nota, en la octava mas alta
+C 0x6b8e y la octava
+C 0x6b95 doblar el periodo es bajar una octava exacta
+L 0x6b98 pon_el_periodo
+C 0x6b98 el desafine
+C 0x6b9e con esto se le suma uno, para desafinar a proposito
+L 0x6b9f escribe_las_dos_mitades_del_tono
+C 0x6b9f c es el registro alto del periodo
+C 0x6ba4 el mismo registro
+C 0x6ba5 y c-1 el bajo
+L 0x6baa avanza_el_guion
+C 0x6baa el guion avanza un byte
+C 0x6bab y queda apuntado
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x595a ----------------------------------------------------------------------
+B 0x595a La cuenta del arbitro: el numero grande son DOS sprites en 0x3B78, y
+B 0x595a la cifra va ademas en casillas. (0xE22C) lleva por donde va.
+L 0x595a pinta_la_cuenta
+C 0x595a la fila 0xCF, fuera de la pantalla
+C 0x595c (0xE22C)
+C 0x5960 por debajo de 2 no hay cuenta
+C 0x5963 el 0x0C la acaba...
+C 0x5967 ...y se borra
+C 0x596b el numero, a E
+C 0x596c (0xE26E)
+C 0x596f con algo, nada
+C 0x5971 (0xE26C), donde esta la campana
+C 0x5974 sesenta casillas mas arriba
+C 0x5978 la tabla de nombres
+C 0x597a el numero
+C 0x597b desde cero
+C 0x597c a BCD
+C 0x597f y se pinta
+C 0x5982 la columna
+C 0x5983 de 0 a 31
+C 0x5985 por ocho: el pixel
+C 0x5988 menos ocho
+C 0x598a el patron 0x25
+C 0x598c los registros de sprite, en 0xE150
+C 0x5990 el patron
+C 0x5992 la fila
+C 0x5993 el segundo va ocho pixeles mas alla
+C 0x5997 columna 0xC0
+C 0x599a color 1
+C 0x599d el mismo patron
+C 0x599f (0xE22C)
+C 0x59a2 en el 0x0B...
+C 0x59a7 ...ocho pixeles mas
+C 0x59a9 la fila
+C 0x59ab columna 0xC4
+C 0x59ae color 1
+C 0x59b1 la tabla de sprites, sprite 30
+C 0x59b4 ocho bytes
+L 0x59ba pinta_la_cifra_de_la_cuenta
+C 0x59ba el 0x10 son dos cifras
+C 0x59bf y una sola con las casillas de 0x30
+B 0x6f59 ======================================================================
+B 0x6f59 LA ENTRADA AL CUADRILATERO
+B 0x6f59 ======================================================================
+B 0x6f59 (0xE112) es la columna, que sube de dos en dos, y (0xE110) las vueltas
+B 0x6f59 dadas. Los sprites se montan en 0xE114 y se vuelcan de golpe a 0x3B50,
+B 0x6f59 que es el sprite 20; los que no se usan se aparcan en la fila 0xCF.
+L 0x6f59 anda_hacia_el_cuadrilatero
+C 0x6f59 (0xE111), la espera
+C 0x6f5d ya a cero?
+C 0x6f60 mientras corra, quieto
+C 0x6f62 (0xE112), la columna
+C 0x6f63 dos pixeles...
+C 0x6f65 la columna
+C 0x6f66 ...hasta la 0x72
+C 0x6f6a (0xE110), las vueltas
+C 0x6f6c una mas
+C 0x6f6e a la cuarta ya no se para
+C 0x6f74 y si no, se vuelve dos pixeles
+C 0x6f76 el primer guion
+C 0x6f78 24 cuadros de espera
+C 0x6f7a las vueltas impares...
+C 0x6f7d ...van con el segundo guion
+C 0x6f7f y 48 de espera
+C 0x6f81 con el sonido 0x5C
+C 0x6f86 el guion que toca
+C 0x6f87 la espera
+C 0x6f8b la columna 0xE0 es el final
+C 0x6f8f se apunta en (0xE27F)
+C 0x6f92 el sonido 0x2B, el silencio
+C 0x6f97 la columna...
+C 0x6f9b ...y las vueltas, a cero
+C 0x6f9c y el paso 1 en (0xE1FF)
+C 0x6fa0 el guion 3
+C 0x6fa4 el sonido que suena
+C 0x6fa7 el 0x19 ya esta puesto
+C 0x6fab y si no, se pide
+C 0x6fb0 el guion 0...
+C 0x6fb1 el bit 4 de la columna alterna los dos guiones del paso
+C 0x6fb6 la tabla de guiones de 0x7013
+C 0x6fb9 el que toca...
+C 0x6fba ...contado de dos en dos
+C 0x6fbf y su direccion
+C 0x6fc2 los registros de sprite, en 0xE114
+C 0x6fc7 veintidos bytes
+C 0x6fc9 a la fila 0xCF, o sea aparcados
+C 0x6fd0 la columna de ahora
+C 0x6fd4 el guion
+C 0x6fd5 el 0xFF acaba
+C 0x6fd9 la fila, con 0x78 de margen
+C 0x6fde la columna del guion...
+C 0x6fdf ...mas la de ahora
+C 0x6fe3 el patron
+C 0x6fe7 y el color
+C 0x6fed los registros montados
+C 0x6fee la tabla de sprites, sprite 20
+C 0x6ff1 veintidos bytes
+L 0x6ff7 pinta_la_marca_del_asalto
+C 0x6ff7 (0xE110)
+C 0x6ffa su bit 0
+C 0x6ffc (0xE210), el asalto
+C 0x7000 contado desde cero
+C 0x7002 palabras
+C 0x7003 las dos parejas de 0x7011
+C 0x7009 dos casillas
+C 0x700c fila 14, columna 17
+B 0x704c ----------------------------------------------------------------------
+B 0x704c Las figurillas de cuatro casillas que marcan el asalto, en tres sitios
+B 0x704c de la fila 18 en adelante. (0xE12B) es el paso.
+L 0x704c pinta_las_figurillas
+C 0x704c las cuatro casillas de 0x7082
+C 0x704f (0xE12B), el paso
+C 0x7053 ya a cero?
+C 0x7054 a cero, nada
+C 0x7055 uno mas
+C 0x7056 en el 1 se pintan
+C 0x7059 y en el 4...
+C 0x705c ...se acaba
+C 0x705e con el sonido 0x1F
+C 0x7063 y las otras cuatro casillas
+C 0x7066 fila 18, columna 17
+C 0x7069 dos casillas
+C 0x706c la primera
+C 0x7070 0x21 mas alla
+C 0x7075 y 0x20 mas
+C 0x7077 donde toca
+C 0x707a una casilla mas
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+B 0x4984 ----------------------------------------------------------------------
+B 0x4984 Las acciones que no salen del mando, una rutina cada una. (0xE228) las
+B 0x4984 lleva: 0 quieto, de 1 a 3 de pie o agachado, 4 la guardia, de 9 a 0x0C
+B 0x4984 los cuatro golpes -que son las acciones 5 a 8 con cuatro sumados-,
+B 0x4984 0x0D esperar, 0x0E encajar, 0x0F retroceder y 0x10 en el suelo.
+L 0x4984 encaja_el_golpe
+C 0x4984 el temporizador, en (0xE227)
+C 0x4985 mientras corra, quieto
+C 0x4986 de que lado es
+C 0x4988 el byte 0 del de la derecha...
+C 0x498d ...o el del de la izquierda: siempre el del OTRO
+C 0x4990 catorce cuadros
+C 0x4992 con un 8 ahi
+C 0x4996 y dieciseis con lo demas
+C 0x4998 el temporizador, puesto
+C 0x4999 y luego la accion 0x0F
+L 0x499d retrocede
+C 0x499d mientras corra el temporizador, quieto
+C 0x499f de que lado es
+C 0x49a1 el de la izquierda anda a la izquierda...
+C 0x49a3 el byte 0 del otro
+C 0x49a8 ...y el de la derecha a la derecha: los dos se apartan
+C 0x49ac HL a (0xE228)
+C 0x49ad la accion 0, quieto
+C 0x49af y con un 7 en el byte 0 del otro...
+C 0x49b2 ...ocho cuadros
+C 0x49b5 (0xE226) a cero
+C 0x49b8 y se echa a andar
+B 0x49bc ----------------------------------------------------------------------
+B 0x49bc PEGAR CANSA. Al acabarse el golpe se le suma a QUIEN LO DIO el numero
+B 0x49bc que le toca en la tabla de 0x6854: 3 al golpe 5, 2 al 6 y 1 a los otros
+B 0x49bc dos. Y (0xE24C) o (0xE24D) se cargan con 0xC0, que
+B 0x49bc mira_si_entra_el_golpe va gastando con un `srl` por cuadro: los dos
+B 0x49bc bits solo salen por el acarreo en los cuadros SEPTIMO y OCTAVO, que es
+B 0x49bc la ventana en la que el golpe puede tocar.
+L 0x49bc acaba_el_golpe
+C 0x49bc mientras corra el temporizador, quieto
+C 0x49be doce cuadros...
+C 0x49c0 (0xE206), lo duro que juega
+C 0x49c3 ...o catorce por debajo de 8
+C 0x49c9 el temporizador, puesto
+C 0x49ca (0xE225), la accion de antes
+C 0x49cd guardada
+C 0x49ce y se vuelve a ella
+C 0x49d1 del 5 al 8...
+C 0x49d3 ...la tabla de 0x6854: 3, 2, 1 y 1
+C 0x49d9 lo que cansa
+C 0x49da de que lado es
+C 0x49db el castigo del de la derecha...
+C 0x49e1 ...o el del de la izquierda, que es el suyo
+C 0x49e3 su nivel
+C 0x49e4 del 7 en adelante ya no sube mas
+C 0x49e9 el golpe
+C 0x49ea el 8 suena distinto
+C 0x49f2 y suena
+C 0x49f5 (0xE24C) o (0xE24D)
+C 0x49f8 la de su lado
+C 0x49fb 0xC0: la ventana en que el golpe toca
+L 0x49fe cae_al_suelo
+C 0x49fe mientras corra el temporizador, quieto
+C 0x4a00 diez cuadros
+C 0x4a03 y luego la accion 0x0D, esperar
+C 0x4a05 de que lado es
+C 0x4a06 la casilla y el paso, para la cuenta
+C 0x4a0f columna 2, pixel 40 al OTRO...
+C 0x4a17 ...o columna 22, pixel 200: cada uno a su esquina
+C 0x4a1d y la otra pareja
+L 0x4a1f coloca_la_cuenta
+C 0x4a1f el pixel del de la derecha
+C 0x4a22 de que lado es
+C 0x4a26 0x90...
+C 0x4a2a ...o 0x50 y el pixel del de la izquierda
+C 0x4a2e con el pixel por encima...
+C 0x4a31 ...se cambia de pareja
+C 0x4a33 el pixel del caido
+C 0x4a34 entre ocho: la columna
+C 0x4a3a mas lo que traiga C
+C 0x4a3b y ahi va la cuenta, en (0xE26C)
+C 0x4a3f el paso, en (0xE26D)
+C 0x4a41 y (0xE26E) a cero
+C 0x4a43 (0xE24F)
+C 0x4a47 con el sonido 0x53, el de la cuenta
+L 0x4a4c espera_a_levantarse
+C 0x4a4c la accion, en (0xE228)
+C 0x4a4d (0xE234)...
+C 0x4a52 ...(0xE257)...
+C 0x4a57 ...y (0xE224): mientras alguno tenga algo, se sigue esperando
+C 0x4a5c y al quedar los tres a cero, a la accion 0
+B 0x4211 ----------------------------------------------------------------------
+L 0x4211 espera_y_quita_dos_bits
+C 0x4211 el temporizador de la escena
+C 0x4215 mientras corra, nada
+C 0x4216 y al acabar se le quitan los bits 0 y 6 a (DE)
+C 0x421a y al paso siguiente
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x421d borra_de_0xe210_en_adelante
+L 0x42ca monta_la_presentacion
+L 0x42d0 monta_la_fuente_en_0x3600
+L 0x42e4 monta_el_fondo_de_la_presentacion
+L 0x42f5 prepara_la_partida
+L 0x4361 prepara_y_monta_el_combate
+L 0x436b baja_el_telon
+L 0x4384 apaga_todos_los_sprites
+L 0x4391 monta_la_presentacion_entera
+L 0x439e monta_una_columna_del_fondo
+L 0x43e2 borra_el_cursor
+L 0x43e5 pinta_el_cursor
+L 0x43f2 donde_va_el_cursor
+L 0x43fd arranca_el_psg_y_el_vdp
+L 0x444b lee_un_puerto_del_psg
+L 0x4589 vuelca_en_la_vram_sin_fijar
+L 0x4e6a borra_dos_casillas
+L 0x53c9 elige_guion_corto_con_a
+L 0x5798 pinta_el_reloj
+L 0x593a pinta_los_tres_sprites_con_el_color_de_c
+L 0x6ae2 arranca_la_nota
+L 0x7077 pinta_cuatro_casillas
+C 0x4220 los 0xFF de 0xE210 a 0xE30F
+C 0x4238 los dos de abajo
+C 0x423a un rival mas
+C 0x423b con el 2...
+C 0x423f ...se salta al siguiente grupo de dieciseis
+C 0x4248 y un asalto mas
+C 0x424b (0xE050), la cuenta de partidas
+C 0x4260 (0xE00D) a cero
+C 0x426a se prepara otra partida
+C 0x4272 el temporizador de la escena
+C 0x427d el cursor
+C 0x4280 dos casillas mas alla
+C 0x4282 y veinticinco a cero
+C 0x4296 la presentacion entera
+C 0x4299 el guion de 0x5C5D
+C 0x42a5 lo que dio un mando
+C 0x42a6 lo que dio el otro mando
+C 0x42a9 los dos juntos
+C 0x42ae la pantalla, apagada
+C 0x42b1 el color 0xCF
+C 0x42ca el cartel de KONAMI
+C 0x42cd y la letra
+C 0x4301 (0xE208) sera 0x41...
+C 0x430a ...o 0x42 con el bit 4 puesto
+C 0x430b con el 0x71 exacto...
+C 0x430d ...el rival 1 y (0xE206) a cero
+C 0x430f y si no, el 0x10 y un 3
+C 0x4317 (0xE206), lo duro que juega
+C 0x431b (0xE208), en su sitio
+C 0x4327 (0xE051), una partida mas
+C 0x433b los registros de dibujo
+C 0x433e el de la izquierda
+C 0x4344 las figurillas del asalto
+C 0x4354 sin nada pendiente, se acaba aqui
+C 0x4355 los golpes que entran
+C 0x4358 el castigo
+C 0x435b las barras
+C 0x4364 (0xE206), lo duro que juega
+C 0x4367 con lo que traiga B
+C 0x4368 y a montar el cuadrilatero
+C 0x436e el contador de cuadros
+C 0x438c a la vez, los 128 bytes
+C 0x438f y sale con Z
+C 0x4394 (0xE00A), la columna, a cero
+C 0x43a1 y R1 con el bit 6: encendida
+C 0x43a7 la columna
+C 0x43a8 y la siguiente para la proxima
+C 0x43b0 la columna, a C
+C 0x43b1 la columna, sumada
+C 0x43b3 y a B
+C 0x43bc el codigo, a C
+C 0x43bf desde cero
+C 0x43c1 la casilla
+C 0x43ca el codigo de casilla
+C 0x43cb y la siguiente, una mas
+C 0x43d3 se pinta
+C 0x43d6 y sale sin acarreo: no queda nada
+C 0x43d8 el temporizador de la escena
+C 0x43db las dos casillas del cursor
+C 0x43de su bit 3
+C 0x43e2 y con el a cero, dos ceros: se borra
+C 0x43e8 la primera...
+C 0x43ec ...y la segunda al lado
+C 0x43f5 mas veinte...
+C 0x43f7 ...entre cuatro
+C 0x43fa fila 0x1A de la tabla de nombres
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x40ee (0xE1FE), el aviso de que el de la derecha ha pegado
+C 0x40f2 a cero no baja mas
+C 0x40f5 y uno menos cada cuadro
+C 0x40f8 (0xE22E)
+C 0x40fc a cero no baja mas
+C 0x40ff y uno menos cada cuadro
+C 0x41b8 el telon, un paso mas
+C 0x41bb mientras siga bajando, nada
+C 0x41bc a la escena 2, la demostracion
+C 0x41e6 la escena
+C 0x41e9 y 32 cuadros de temporizador
+C 0x69c7 lo que se guardo al entrar
+C 0x69ca y se sueltan las interrupciones

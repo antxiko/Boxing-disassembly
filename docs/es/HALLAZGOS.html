@@ -1,0 +1,120 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hallazgos — Konami&#x27;s Boxing (Konami, 1985)</title>
+<style>
+:root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
+  --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+@media (prefers-color-scheme:light){:root{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;
+  --panel:#f7f6f2;--linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}}
+:root[data-theme="dark"]{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;
+  --linea:#23262e;--rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+:root[data-theme="light"]{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;--panel:#f7f6f2;
+  --linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);padding:0 1.25rem 6rem;
+  font:15px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.w{max-width:1120px;margin:0 auto}
+.n{max-width:68ch}
+h1,h2,h3,h4{font-weight:400;text-wrap:balance}
+a{color:var(--cyan)}
+img{image-rendering:pixelated;max-width:100%;height:auto;display:block}
+header.top{display:flex;flex-direction:column;align-items:center;gap:1.5rem;
+  padding:4rem 0 2rem;text-align:center}
+header.top img{width:min(100%,642px)}
+.claim{max-width:60ch;color:var(--suave);font-size:1.05rem}
+.claim b{color:var(--tinta);font-weight:400}
+.ficha{display:flex;flex-wrap:wrap;justify-content:center;gap:0 1.5rem;width:100%;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+  border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:.85rem 0}
+.ficha b{color:var(--rojo);font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;padding:1.25rem 0;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+nav a{color:var(--suave);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{color:var(--tinta);border-bottom-color:var(--rojo)}
+nav.docs{border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);
+  margin-bottom:1rem}
+section{margin-top:4.5rem;scroll-margin-top:1rem}
+section>h2{font-size:1rem;letter-spacing:.1em;text-transform:uppercase;
+  border-left:3px solid var(--rojo);padding-left:.9rem;margin:0 0 1.5rem}
+.cifras{display:grid;gap:1px;background:var(--linea);border:1px solid var(--linea);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifra{background:var(--panel);padding:1.1rem}
+.cifra b{display:block;font-size:1.7rem;color:var(--oro);font-weight:400;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.cifra span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--suave)}
+.hall{border-top:1px solid var(--linea);padding-top:1.75rem;margin-top:2.5rem}
+.hall:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.hall h3{margin:0 0 .75rem;font-size:1.15rem;color:var(--rojo)}
+.hall h4{color:var(--oro);margin:1.5rem 0 .5rem;font-size:.95rem}
+.hall p{margin:0 0 1rem}
+pre.asm{background:var(--panel);border-left:2px solid var(--verde);margin:1.25rem 0;
+  padding:1rem 1.1rem;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--tinta)}
+.par{display:grid;gap:1.25rem;grid-template-columns:1fr}
+@media(min-width:820px){.par{grid-template-columns:1fr 1fr}}
+.par figure{margin:0}
+table{border-collapse:collapse;width:100%;margin:1.25rem 0;font-size:13px;display:block;
+  overflow-x:auto}
+th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--linea)}
+th{color:var(--suave);font-weight:400;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+td.num{font-variant-numeric:tabular-nums;color:var(--oro)}
+.nivel{margin-top:2rem}
+.nivel h3{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.nivel em{color:var(--cyan);font-style:normal}
+.sep{color:var(--suave);margin:0 .6rem}
+.rejilla{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.rejilla figure{margin:0;background:var(--panel);box-shadow:0 0 0 1px var(--linea)}
+.rejilla figcaption{display:flex;justify-content:space-between;padding:.45rem .65rem;
+  font-size:11px;color:var(--suave);border-top:1px solid var(--linea)}
+.dir{font-variant-numeric:tabular-nums;color:var(--verde)}
+footer{margin-top:5rem;padding-top:1.5rem;border-top:1px solid var(--linea);
+  color:var(--suave);font-size:12px}
+
+/* Aviso de trabajo en curso: tiene que verse antes que las cifras, porque un
+   100% mal leido hace mas dano que no ponerlo. */
+.aviso{background:#3a2a10;border-left:3px solid var(--oro);margin:1.5rem auto;
+  padding:1rem 1.2rem;max-width:900px;border-radius:4px}
+.aviso p{margin:0;color:var(--tinta);font-size:15px;line-height:1.65}
+.galeria{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin:1.5rem 0}
+.galeria figure{margin:0}
+.galeria img{width:100%;height:auto;image-rendering:pixelated;
+  border:1px solid var(--linea);border-radius:3px}
+.galeria figcaption{color:var(--suave);font-size:13px;margin-top:.5rem}
+audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
+</style>
+<div class="w"><nav class="top"><a href="index.html">Portada</a><a href="EMPEZAR.html">Empezar</a><a href="EL-JUEGO.html">El juego</a><a href="EL-CARTUCHO.html">El cartucho</a><a href="EL-CODIGO.html">El código</a><a href="HALLAZGOS.html" style=color:var(--tinta)>Hallazgos</a><a href="EN-EL-EMULADOR.html">En el emulador</a><a href="PREGUNTAS-ABIERTAS.html">Preguntas abiertas</a><a href="../FINDINGS.html" style="margin-left:auto;color:var(--oro)">English</a></nav>
+<h1 id="hallazgos">Hallazgos</h1>
+<p>Lo que aparecio al desmontarlo. Cada uno con la medida al lado.</p>
+<h2 id="seis-rivales-y-solo-tres-juegos-de-figuras">Seis rivales y solo TRES juegos de figuras</h2>
+<p>Los nombres son seis y estan en una tabla de seis punteros (0x5661). Los <b>dibujos</b> salen de otra tabla, la de 0x52C9, y esa tiene <b>tres</b> palabras: 0x825C, 0x9670 y 0xABB4, que son las tablas de los archivos de figuras 2, 3 y 4. 0x4F8D la indexa con <code>(0xE207) &amp; 3</code>.</p>
+<p>Una cuarta palabra caeria en 0x52CF, que ya es codigo. Pero no se lee nunca: 0x423B fuerza el salto al siguiente grupo de dieciseis en cuanto <code>(0xE207) &amp; 3</code> llega a 2, asi que el indice solo vale 0, 1 o 2.</p>
+<p>Los tres rivales de la segunda vuelta son los tres primeros <b>con el color cambiado</b>: 0x526F y 0x51BE cambian el color 4 por el 0x0C cuando (0xE207) lleva el bit 4 puesto.</p>
+<p><img src="../img/poses_rival_2.png?v=3b0e2dd1" alt="Los tres archivos de rival"></p>
+<h2 id="pegar-cansa">Pegar cansa</h2>
+<p>Al acabarse un golpe, <code>acaba_el_golpe</code> (0x49BC) le suma <b>a quien lo ha dado</b> lo que dice la tabla de 0x6854, y el resultado va a su propio castigo:</p>
+<table><tr><th>golpe</th><th>castiga al otro (0x6850)</th><th>cansa al que pega (0x6854)</th></tr><tr><td>5</td><td>12</td><td>3</td></tr><tr><td>6</td><td>10</td><td>2</td></tr><tr><td>7</td><td>9</td><td>1</td></tr><tr><td>8</td><td>2</td><td>1</td></tr></table>
+<p>Las dos tablas van en el <b>mismo orden</b>: el golpe que mas castiga es tambien el que mas cansa. Y por encima del nivel 7 ya no sube: <code>cp 007h</code> en 0x49E4.</p>
+<h2 id="el-golpe-solo-toca-en-el-septimo-y-el-octavo-cuadro">El golpe solo toca en el septimo y el octavo cuadro</h2>
+<p>0x49FB carga <b>0xC0</b> en (0xE24C) o (0xE24D), y <code>pega_el_de_la_derecha</code> (0x4CCF) lo gasta con un <code>srl</code> por cuadro, saliendose con <code>ret nc</code> mientras no haya acarreo. De 0xC0, el acarreo solo sale en la septima y la octava vuelta. Fuera de esa ventana el golpe no puede tocar.</p>
+<h2 id="el-marcador-se-lleva-al-reves">El marcador se lleva al reves</h2>
+<p>(0xE21E) y (0xE21F) son las tarjetas de los jueces, y no van sumando puntos: van sumando <b>faltas</b>.</p>
+<ul><li>una si un boxeador lleva <b>tres niveles o mas</b> de castigo que el otro;</li><li>otra al que menos golpes haya acertado;</li><li>y el doble de lo que diga (0xE23E) o (0xE261).</li></ul>
+<p>Al final, 0x4ECD hace <code>10 - faltas</code> en las dos y luego las <b>sube a la vez</b> hasta que una llega al diez. Es el sistema de los diez puntos del boxeo de verdad.</p>
+<h2 id="la-maquina-juega-al-de-la-izquierda">La maquina juega al de la izquierda</h2>
+<p>Con un solo jugador, el boxeador de la izquierda lo lleva <code>decide_la_maquina</code> (0x4A6B) y el humano es el de la derecha, que es el que va con el puerto 1 y el cursor. Lo dicen tres cosas independientes:</p>
+<ol><li>al colocarlos (0x49FE), al de 0xE232 le toca la columna 22 y al de 0xE255 la 2;</li><li>al andar, el de 0xE255 se acerca <b>sumando</b> y el de 0xE232 <b>restando</b>, y los topes de columna son 22 por arriba para uno y 2 por abajo para el otro;</li><li>la maquina se acerca <b>andando a la derecha</b> (0x4A83) y se retira a la izquierda (0x4B39), que es lo que le toca al de ese lado.</li></ol>
+<p>En la escena 2 &amp;mdash;la demostracion&amp;mdash; al de la derecha lo mueve el registro <b>R</b> del Z80 (0x4836): juegan solos los dos.</p>
+<p>La maquina devuelve la accion en B con un numero de propina en el nibble alto, y ese numero se va sumando a (0xE254) <b>mientras anda</b>. (0xE254) es lo que luego elige el guion de golpes en 0x4C1C: cuanto mas anda, mas cambia lo que va a hacer.</p>
+<h2 id="los-ocho-bytes-que-nadie-leia">Los ocho bytes que nadie leia</h2>
+<p>La cabecera de una figura mide <code>17 + 5N</code>. De ella, los <b>ocho bytes</b> que 0x500C se salta con un <code>ld a,008h</code> &amp;mdash;los que van en <code>figura + 9 + 3N</code>&amp;mdash; son la <b>disposicion</b>: uno por fila, con el nibble alto diciendo cuanto se corre a la derecha y el bajo cuantas casillas van seguidas. De 8 en adelante, esa fila no se pinta.</p>
+<p>Con ellos la figura se coloca sola, y la prueba no es que quede bonita: la tabla de nombres que sale cuadra <b>byte a byte</b> con la del emulador.</p>
+<h2 id="el-sexto-rival-se-llama-moai-jr">El sexto rival se llama MOAI Jr.</h2>
+<p>La casilla 0x58 no es la X del ASCII. Dibujando la fuente se ve que es un glifo con la <b>&quot;r&quot; y el punto juntos</b>, asi que el nombre <code>04 4D 4F 41 49 51 4A 58</code> se lee <b>MOAI&amp;middot;Jr.</b> &amp;mdash;el hijo de MOAI&amp;middot;KING, con el que comparte el archivo de figuras 4, que es un moai.</p>
+<p><img src="../img/fuente.png?v=622fcdeb" alt="La fuente"></p>
+<h2 id="el-fondo-no-es-el-de-la-tabla-de-arranque">El fondo no es el de la tabla de arranque</h2>
+<p>R7 = 0xE4 sale de los ocho registros de 0x4429, y dice borde azul. Pero <code>monta_una_columna_del_fondo</code> (0x439E) escribe <b>0xE1</b> en R7 en cada llamada, y de la presentacion en adelante el fondo es <b>negro</b>. Se vio comparando con el emulador: montar la pantalla con el azul de la tabla la deja de otro color.</p>
+<h2 id="codigo-que-no-llama-nadie">Codigo que no llama nadie</h2>
+<p>Tres trozos que son instrucciones validas, encajan entre las rutinas de al lado y a los que <b>no llega ni un <code>call</code>, ni un <code>jp</code>, ni una palabra de ninguna tabla</b> &amp;mdash;comprobado buscando los dos bytes en toda la ROM:</p>
+<ul><li><b>0x4038</b>, que deja el puerto de datos del VDP en C, lo mismo que la cola de <code>prepara_la_escritura</code>;</li><li><b>0x45CA</b>, hermana de <code>descomprime_en_tres_bancos</code> que usa <code>vuelca_en_la_vram</code> en vez del descompresor;</li><li><b>0x54EC</b>, una entrada alternativa al pintor de piezas.</li></ul>
+<p>Y uno mas que si se ejecuta y no hace nada: 0x470D escribe en 0x4F84, que es <b>ROM</b>.</p>
+<footer><p><em>Konami's Boxing</em> lo publico Konami para MSX en 1985; su numero de catalogo es RC-736 y son 32 KB. Todos los derechos sobre el juego siguen siendo de sus titulares. Este trabajo es de preservacion, estudio y documentacion, y la imagen del cartucho no se distribuye.</p></footer></div>

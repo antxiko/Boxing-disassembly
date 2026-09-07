@@ -1,0 +1,28 @@
+# Puntos de entrada que el trazado NO puede deducir solo.
+#
+# Cada uno lleva su justificacion: si no se puede decir POR QUE es codigo, no
+# se declara.
+
+0x4091   ; INIT, la direccion que declara la cabecera "AB" de 0x4000
+0x403d   ; gancho de interrupcion H.KEYI, instalado por INIT en 0x40B7 (0xFD9B)
+
+# Tabla de despacho tras el unico `call 406Ch` del cartucho. El despachador
+# (0x406C) saca de la pila la direccion de retorno -que ES la tabla-, la
+# indexa con A*2 y salta. El tamano sale de la regla de siempre: la entrada
+# mas baja marca donde acaba la tabla y empieza el codigo apuntado.
+!tabla 0x411c  11   # tras el `call 406Ch` de 0x4119; sigue en 0x4132
+
+# Los dos destinos del `jp (hl)` de 0x42C9. No es una tabla: el codigo de
+# 0x42BB carga HL con 0x407A y, si el bit 4 de (0xE003) esta a uno, lo cambia
+# por 0x4076. Los dos caen en la misma rutina y solo se diferencian en la
+# mascara que dejan en C -0x00 o 0xFF- antes de juntarse en 0x407C.
+0x4076   ; destino del `jp (hl)` de 0x42C9 con el bit 4 de (0xE003) a uno: mascara 0x00
+0x407a   ; el otro destino del mismo `jp (hl)`: mascara 0xFF
+
+# CODIGO QUE NO LLAMA NADIE. Ni un call, ni un jp, ni una palabra de ninguna
+# tabla los nombra -comprobado buscando los dos bytes en TODA la ROM-, pero
+# son instrucciones validas y encajan entre las rutinas de al lado. Se
+# declaran para que salgan como codigo y no como un volcado de bytes.
+0x4038   ; `ld a,(0006h) / ld c,a / ret`: el puerto de datos del VDP en C, lo mismo que la cola de prepara_la_escritura
+0x45ca   ; hermana de descomprime_en_tres_bancos que usa vuelca_en_la_vram en vez del descompresor
+0x54ec   ; entrada alternativa al pintor de piezas: fija la escritura desde DE y cae en 0x54F1

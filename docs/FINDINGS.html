@@ -1,0 +1,120 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Findings — Konami&#x27;s Boxing (Konami, 1985)</title>
+<style>
+:root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
+  --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+@media (prefers-color-scheme:light){:root{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;
+  --panel:#f7f6f2;--linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}}
+:root[data-theme="dark"]{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;
+  --linea:#23262e;--rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+:root[data-theme="light"]{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;--panel:#f7f6f2;
+  --linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);padding:0 1.25rem 6rem;
+  font:15px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.w{max-width:1120px;margin:0 auto}
+.n{max-width:68ch}
+h1,h2,h3,h4{font-weight:400;text-wrap:balance}
+a{color:var(--cyan)}
+img{image-rendering:pixelated;max-width:100%;height:auto;display:block}
+header.top{display:flex;flex-direction:column;align-items:center;gap:1.5rem;
+  padding:4rem 0 2rem;text-align:center}
+header.top img{width:min(100%,642px)}
+.claim{max-width:60ch;color:var(--suave);font-size:1.05rem}
+.claim b{color:var(--tinta);font-weight:400}
+.ficha{display:flex;flex-wrap:wrap;justify-content:center;gap:0 1.5rem;width:100%;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+  border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:.85rem 0}
+.ficha b{color:var(--rojo);font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;padding:1.25rem 0;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+nav a{color:var(--suave);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{color:var(--tinta);border-bottom-color:var(--rojo)}
+nav.docs{border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);
+  margin-bottom:1rem}
+section{margin-top:4.5rem;scroll-margin-top:1rem}
+section>h2{font-size:1rem;letter-spacing:.1em;text-transform:uppercase;
+  border-left:3px solid var(--rojo);padding-left:.9rem;margin:0 0 1.5rem}
+.cifras{display:grid;gap:1px;background:var(--linea);border:1px solid var(--linea);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifra{background:var(--panel);padding:1.1rem}
+.cifra b{display:block;font-size:1.7rem;color:var(--oro);font-weight:400;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.cifra span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--suave)}
+.hall{border-top:1px solid var(--linea);padding-top:1.75rem;margin-top:2.5rem}
+.hall:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.hall h3{margin:0 0 .75rem;font-size:1.15rem;color:var(--rojo)}
+.hall h4{color:var(--oro);margin:1.5rem 0 .5rem;font-size:.95rem}
+.hall p{margin:0 0 1rem}
+pre.asm{background:var(--panel);border-left:2px solid var(--verde);margin:1.25rem 0;
+  padding:1rem 1.1rem;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--tinta)}
+.par{display:grid;gap:1.25rem;grid-template-columns:1fr}
+@media(min-width:820px){.par{grid-template-columns:1fr 1fr}}
+.par figure{margin:0}
+table{border-collapse:collapse;width:100%;margin:1.25rem 0;font-size:13px;display:block;
+  overflow-x:auto}
+th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--linea)}
+th{color:var(--suave);font-weight:400;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+td.num{font-variant-numeric:tabular-nums;color:var(--oro)}
+.nivel{margin-top:2rem}
+.nivel h3{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.nivel em{color:var(--cyan);font-style:normal}
+.sep{color:var(--suave);margin:0 .6rem}
+.rejilla{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.rejilla figure{margin:0;background:var(--panel);box-shadow:0 0 0 1px var(--linea)}
+.rejilla figcaption{display:flex;justify-content:space-between;padding:.45rem .65rem;
+  font-size:11px;color:var(--suave);border-top:1px solid var(--linea)}
+.dir{font-variant-numeric:tabular-nums;color:var(--verde)}
+footer{margin-top:5rem;padding-top:1.5rem;border-top:1px solid var(--linea);
+  color:var(--suave);font-size:12px}
+
+/* Aviso de trabajo en curso: tiene que verse antes que las cifras, porque un
+   100% mal leido hace mas dano que no ponerlo. */
+.aviso{background:#3a2a10;border-left:3px solid var(--oro);margin:1.5rem auto;
+  padding:1rem 1.2rem;max-width:900px;border-radius:4px}
+.aviso p{margin:0;color:var(--tinta);font-size:15px;line-height:1.65}
+.galeria{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin:1.5rem 0}
+.galeria figure{margin:0}
+.galeria img{width:100%;height:auto;image-rendering:pixelated;
+  border:1px solid var(--linea);border-radius:3px}
+.galeria figcaption{color:var(--suave);font-size:13px;margin-top:.5rem}
+audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
+</style>
+<div class="w"><nav class="top"><a href="index.html">Home</a><a href="GETTING-STARTED.html">Start</a><a href="THE-GAME.html">The game</a><a href="THE-CARTRIDGE.html">The cartridge</a><a href="THE-CODE.html">The code</a><a href="FINDINGS.html" style=color:var(--tinta)>Findings</a><a href="IN-THE-EMULATOR.html">In the emulator</a><a href="OPEN-QUESTIONS.html">Open questions</a><a href="es/HALLAZGOS.html" style="margin-left:auto;color:var(--oro)">Castellano</a></nav>
+<h1 id="findings">Findings</h1>
+<p>What turned up when we took it apart. Each one with its measurement.</p>
+<h2 id="six-opponents-and-only-three-sets-of-figures">Six opponents and only THREE sets of figures</h2>
+<p>There are six names, in a table of six pointers (0x5661). The <b>drawings</b> come from another table, the one at 0x52C9, and that one has <b>three</b> words: 0x825C, 0x9670 and 0xABB4, the tables of figure archives 2, 3 and 4. 0x4F8D indexes it with <code>(0xE207) &amp; 3</code>.</p>
+<p>A fourth word would fall at 0x52CF, which is already code. But it is never read: 0x423B forces the jump to the next group of sixteen as soon as <code>(0xE207) &amp; 3</code> reaches 2, so the index is only ever 0, 1 or 2.</p>
+<p>The three opponents of the second round are the first three <b>with the colour swapped</b>: 0x526F and 0x51BE turn colour 4 into 0x0C when (0xE207) has bit 4 set.</p>
+<p><img src="img/poses_rival_2.png?v=3b0e2dd1" alt="The three opponent archives"></p>
+<h2 id="throwing-a-punch-tires-you">Throwing a punch tires you</h2>
+<p>When a punch ends, <code>acaba_el_golpe</code> (0x49BC) adds to <b>whoever threw it</b> what the table at 0x6854 says, and the result goes onto his own damage:</p>
+<table><tr><th>punch</th><th>hurts the other (0x6850)</th><th>tires the thrower (0x6854)</th></tr><tr><td>5</td><td>12</td><td>3</td></tr><tr><td>6</td><td>10</td><td>2</td></tr><tr><td>7</td><td>9</td><td>1</td></tr><tr><td>8</td><td>2</td><td>1</td></tr></table>
+<p>Both tables run in the <b>same order</b>: the punch that hurts most is also the one that tires most. And above level 7 it stops rising: <code>cp 007h</code> at 0x49E4.</p>
+<h2 id="the-punch-only-lands-on-the-seventh-and-eighth-frame">The punch only lands on the seventh and eighth frame</h2>
+<p>0x49FB loads <b>0xC0</b> into (0xE24C) or (0xE24D), and <code>pega_el_de_la_derecha</code> (0x4CCF) spends it with one <code>srl</code> per frame, bailing out with <code>ret nc</code> while there is no carry. Out of 0xC0, carry only comes on the seventh and eighth turn. Outside that window the punch cannot land.</p>
+<h2 id="the-scorecard-is-kept-upside-down">The scorecard is kept upside down</h2>
+<p>(0xE21E) and (0xE21F) are the judges&#x27; cards, and they do not add up points: they add up <b>faults</b>.</p>
+<ul><li>one if a boxer carries <b>three levels or more</b> of damage than the other;</li><li>one to whoever landed fewer punches;</li><li>and twice whatever (0xE23E) or (0xE261) says.</li></ul>
+<p>At the end, 0x4ECD does <code>10 - faults</code> on both and then <b>raises them together</b> until one reaches ten. It is the ten-point must system of real boxing.</p>
+<h2 id="the-machine-plays-the-left-hand-boxer">The machine plays the left-hand boxer</h2>
+<p>With a single player, the left-hand boxer is driven by <code>decide_la_maquina</code> (0x4A6B) and the human is the one on the right, the one wired to port 1 and the cursor keys. Three independent things say so:</p>
+<ol><li>when they are placed (0x49FE), the one at 0xE232 gets column 22 and the one at 0xE255 column 2;</li><li>when walking, the one at 0xE255 closes in by <b>adding</b> and the one at 0xE232 by <b>subtracting</b>, and the column limits are 22 above for one and 2 below for the other;</li><li>the machine closes in <b>walking right</b> (0x4A83) and backs off to the left (0x4B39), which is what the left-hand corner calls for.</li></ol>
+<p>In scene 2 &amp;mdash;the attract match&amp;mdash; the right-hand boxer is driven by the Z80&#x27;s <b>R</b> register (0x4836): both of them play on their own.</p>
+<p>The machine returns the action in B with a bonus number in the high nibble, and that number is added to (0xE254) <b>while it walks</b>. (0xE254) is what later picks the punch script at 0x4C1C: the more it walks, the more what it is about to do changes.</p>
+<h2 id="the-eight-bytes-nobody-was-reading">The eight bytes nobody was reading</h2>
+<p>A figure&#x27;s header is <code>17 + 5N</code> long. Of that, the <b>eight bytes</b> 0x500C skips with a <code>ld a,008h</code> &amp;mdash;the ones at <code>figure + 9 + 3N</code>&amp;mdash; are the <b>layout</b>: one per row, the high nibble saying how far right to shift and the low one how many tiles run together. From 8 upwards, that row is not drawn.</p>
+<p>With them the figure places itself, and the proof is not that it looks right: the name table that comes out matches the emulator&#x27;s <b>byte for byte</b>.</p>
+<h2 id="the-sixth-opponent-is-called-moai-jr">The sixth opponent is called MOAI Jr.</h2>
+<p>Tile 0x58 is not the ASCII X. Drawing the font shows it is a glyph with the <b>&quot;r&quot; and the full stop joined</b>, so the name <code>04 4D 4F 41 49 51 4A 58</code> reads <b>MOAI&amp;middot;Jr.</b> &amp;mdash;MOAI&amp;middot;KING&#x27;s son, with whom he shares figure archive 4, which is a moai.</p>
+<p><img src="img/fuente.png?v=622fcdeb" alt="The font"></p>
+<h2 id="the-backdrop-is-not-the-one-in-the-boot-table">The backdrop is not the one in the boot table</h2>
+<p>R7 = 0xE4 comes from the eight registers at 0x4429, and it says the border is blue. But <code>monta_una_columna_del_fondo</code> (0x439E) writes <b>0xE1</b> into R7 on every call, and from the intro onwards the backdrop is <b>black</b>. It showed up against the emulator: building the screen with the blue from the table leaves it a different colour.</p>
+<h2 id="code-nobody-calls">Code nobody calls</h2>
+<p>Three stretches that are valid instructions, fit between the routines either side of them, and that <b>no <code>call</code>, no <code>jp</code> and no word of any table</b> reaches &amp;mdash;checked by searching for the two bytes across the whole ROM:</p>
+<ul><li><b>0x4038</b>, which leaves the VDP data port in C, the same as the tail of <code>prepara_la_escritura</code>;</li><li><b>0x45CA</b>, a sibling of <code>descomprime_en_tres_bancos</code> that uses <code>vuelca_en_la_vram</code> instead of the decompressor;</li><li><b>0x54EC</b>, an alternative entry to the piece painter.</li></ul>
+<p>And one more that does run and does nothing: 0x470D writes to 0x4F84, which is <b>ROM</b>.</p>
+<footer><p><em>Konami's Boxing</em> was published by Konami for the MSX in 1985; its catalogue number is RC-736 and it is 32 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>

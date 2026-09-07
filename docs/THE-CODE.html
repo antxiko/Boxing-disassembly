@@ -1,0 +1,111 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The code — Konami&#x27;s Boxing (Konami, 1985)</title>
+<style>
+:root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
+  --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+@media (prefers-color-scheme:light){:root{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;
+  --panel:#f7f6f2;--linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}}
+:root[data-theme="dark"]{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;
+  --linea:#23262e;--rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+:root[data-theme="light"]{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;--panel:#f7f6f2;
+  --linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);padding:0 1.25rem 6rem;
+  font:15px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.w{max-width:1120px;margin:0 auto}
+.n{max-width:68ch}
+h1,h2,h3,h4{font-weight:400;text-wrap:balance}
+a{color:var(--cyan)}
+img{image-rendering:pixelated;max-width:100%;height:auto;display:block}
+header.top{display:flex;flex-direction:column;align-items:center;gap:1.5rem;
+  padding:4rem 0 2rem;text-align:center}
+header.top img{width:min(100%,642px)}
+.claim{max-width:60ch;color:var(--suave);font-size:1.05rem}
+.claim b{color:var(--tinta);font-weight:400}
+.ficha{display:flex;flex-wrap:wrap;justify-content:center;gap:0 1.5rem;width:100%;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+  border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:.85rem 0}
+.ficha b{color:var(--rojo);font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;padding:1.25rem 0;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+nav a{color:var(--suave);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{color:var(--tinta);border-bottom-color:var(--rojo)}
+nav.docs{border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);
+  margin-bottom:1rem}
+section{margin-top:4.5rem;scroll-margin-top:1rem}
+section>h2{font-size:1rem;letter-spacing:.1em;text-transform:uppercase;
+  border-left:3px solid var(--rojo);padding-left:.9rem;margin:0 0 1.5rem}
+.cifras{display:grid;gap:1px;background:var(--linea);border:1px solid var(--linea);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifra{background:var(--panel);padding:1.1rem}
+.cifra b{display:block;font-size:1.7rem;color:var(--oro);font-weight:400;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.cifra span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--suave)}
+.hall{border-top:1px solid var(--linea);padding-top:1.75rem;margin-top:2.5rem}
+.hall:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.hall h3{margin:0 0 .75rem;font-size:1.15rem;color:var(--rojo)}
+.hall h4{color:var(--oro);margin:1.5rem 0 .5rem;font-size:.95rem}
+.hall p{margin:0 0 1rem}
+pre.asm{background:var(--panel);border-left:2px solid var(--verde);margin:1.25rem 0;
+  padding:1rem 1.1rem;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--tinta)}
+.par{display:grid;gap:1.25rem;grid-template-columns:1fr}
+@media(min-width:820px){.par{grid-template-columns:1fr 1fr}}
+.par figure{margin:0}
+table{border-collapse:collapse;width:100%;margin:1.25rem 0;font-size:13px;display:block;
+  overflow-x:auto}
+th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--linea)}
+th{color:var(--suave);font-weight:400;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+td.num{font-variant-numeric:tabular-nums;color:var(--oro)}
+.nivel{margin-top:2rem}
+.nivel h3{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.nivel em{color:var(--cyan);font-style:normal}
+.sep{color:var(--suave);margin:0 .6rem}
+.rejilla{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.rejilla figure{margin:0;background:var(--panel);box-shadow:0 0 0 1px var(--linea)}
+.rejilla figcaption{display:flex;justify-content:space-between;padding:.45rem .65rem;
+  font-size:11px;color:var(--suave);border-top:1px solid var(--linea)}
+.dir{font-variant-numeric:tabular-nums;color:var(--verde)}
+footer{margin-top:5rem;padding-top:1.5rem;border-top:1px solid var(--linea);
+  color:var(--suave);font-size:12px}
+
+/* Aviso de trabajo en curso: tiene que verse antes que las cifras, porque un
+   100% mal leido hace mas dano que no ponerlo. */
+.aviso{background:#3a2a10;border-left:3px solid var(--oro);margin:1.5rem auto;
+  padding:1rem 1.2rem;max-width:900px;border-radius:4px}
+.aviso p{margin:0;color:var(--tinta);font-size:15px;line-height:1.65}
+.galeria{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin:1.5rem 0}
+.galeria figure{margin:0}
+.galeria img{width:100%;height:auto;image-rendering:pixelated;
+  border:1px solid var(--linea);border-radius:3px}
+.galeria figcaption{color:var(--suave);font-size:13px;margin-top:.5rem}
+audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
+</style>
+<div class="w"><nav class="top"><a href="index.html">Home</a><a href="GETTING-STARTED.html">Start</a><a href="THE-GAME.html">The game</a><a href="THE-CARTRIDGE.html">The cartridge</a><a href="THE-CODE.html" style=color:var(--tinta)>The code</a><a href="FINDINGS.html">Findings</a><a href="IN-THE-EMULATOR.html">In the emulator</a><a href="OPEN-QUESTIONS.html">Open questions</a><a href="es/EL-CODIGO.html" style="margin-left:auto;color:var(--oro)">Castellano</a></nav>
+<h1 id="the-code">The code</h1>
+<p>The cartridge shares its frame with the other Konami titles of the period: 561 bytes in common with <em>Knightmare</em> (RC-739) and 562 with <em>The Goonies</em> (RC-734), measured with <code>tools/comun_normalizado.py</code>. The dispatcher even falls at the <b>same address</b> as in Knightmare, 0x406C.</p>
+<h2 id="the-interrupt-hook">The interrupt hook</h2>
+<p>0x403D is the whole program. Every frame:</p>
+<ol><li>it reads the VDP status, which is what lowers the interrupt request;</li><li>the <b>sound</b>, always, even if the previous frame has not finished;</li><li>a <b>latch</b> in (0xE005): if the previous frame is still inside, it does not re-enter;</li><li>the controls of both boxers, one with HL&#x27; = 0xE300 and the other with HL&#x27; = 0xE009;</li><li><code>avanza_el_reloj</code> (0x40DB), which counts down the three timers and dispatches the scene;</li><li>and on the way out, if the VDP says there was a collision, another pass of sound.</li></ol>
+<h2 id="the-eleven-scenes">The eleven scenes</h2>
+<p>(0xE000) says which one we are in and (0xE001) the step within it. The table at 0x411C hands out, and nearly all of them start with chained <code>djnz</code>: the step arrives in B and each <code>djnz</code> eats one.</p>
+<p>Scene <b>2</b> is the match. Its per-frame loop is 0x4338, and in thirteen calls it does the whole game: the bell, the sprites, the two boxers, the referee, the punches that land, the damage, the bars and the round.</p>
+<h2 id="the-two-boxers">The two boxers</h2>
+<p>Each one has an <b>eleven-byte</b> block, and the trick is that there is only <b>one</b> work area: 0x46F9 copies whichever one is due to 0xE221, does everything there and puts it back. That way the code carries no player index.</p>
+<table><tr><th>block</th><th>who</th><th>starting column</th></tr><tr><td>0xE232</td><td>the <b>right-hand</b> one</td><td>22</td></tr><tr><td>0xE255</td><td>the <b>left-hand</b> one</td><td>2</td></tr></table>
+<p>(0xE22F) alternates between 0 and 1 on every call and is what says which is which. And each one comes in knowing <b>the other&#x27;s action</b>, which is the only thing it knows about its opponent.</p>
+<h2 id="the-actions">The actions</h2>
+<p>(0xE228) says what he is doing. The table at 0x4C72 turns the five control bits into one of them:</p>
+<table><tr><th>pressed</th><th>action</th><th></th></tr><tr><td>up</td><td>3</td><td>stand up</td></tr><tr><td>down</td><td>1</td><td>duck</td></tr><tr><td>left / right</td><td>9 / 0x0A</td><td>walk</td></tr><tr><td>punch</td><td>8</td><td></td></tr><tr><td>punch + up</td><td>5</td><td></td></tr><tr><td>punch + down</td><td>6</td><td></td></tr><tr><td>punch + left / right</td><td>4 / 7</td><td></td></tr></table>
+<p>The other 23 combinations give zero. When a punch starts, 0x48D6 adds four to it: actions 9 to 0x0C mean &quot;throwing punch 5 to 8&quot;. And 0x0D to 0x10 are wait, take it, back off and <b>go down</b>.</p>
+<h2 id="the-punch-that-lands">The punch that lands</h2>
+<p><code>mira_si_entra_el_golpe</code> (0x4C92) settles it once per boxer, and the order is decided by the parity of (0xE23E)+(0xE261). The two index registers are the split: <b>IY</b> to the block of the one throwing and <b>IX</b> to the action of the one receiving. Hence the punch lands with a <code>ld (ix+000h),00eh</code>, which is the action of taking it, and when the threshold is passed (ix+0) becomes 0x10, which is going down.</p>
+<p>Damage is <b>two bytes</b>: the level, 0 to 8, and what has piled up inside the level. Each level&#x27;s threshold comes from 0x5445, and it <b>falls</b>: the more battered you are, the sooner you go down.</p>
+<h2 id="the-drawing">The drawing</h2>
+<p><code>pinta_una_figura</code> (0x4F66) redraws a boxer&#x27;s body by <b>redefining tiles</b> the screen already has in place. Four pointers per figure: two to the patterns and two to the colour, which sits at the same offset with bit 13 cleared (the <code>res 5,a</code> at 0x4F81).</p>
+<p>Each boxer has <b>two</b> sets of tiles and they take turns frame by frame: 0x30 and 0x80 for the player, 0x58 and 0xA8 for the opponent. While one is on screen, the other is being built.</p>
+<p>And the head and the gloves are not tiles: they are 16x16 <b>sprites</b> that <code>monta_los_sprites_de_una_figura</code> (0x5178) writes in one go, four bytes each, with the spare ones parked on row 0xCF.</p>
+<h2 id="the-sound">The sound</h2>
+<p>Three voices with a fourteen-byte block each from 0xE311. The sound number acts as <b>state and priority</b> at the same time: a new one only gets in if its number is not lower than the one already playing. And how many voices it takes depends on the number: below 7 only the third, from 7 to 0x12 two, and from 0x13 up all three.</p>
+<footer><p><em>Konami's Boxing</em> was published by Konami for the MSX in 1985; its catalogue number is RC-736 and it is 32 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>
