@@ -27,17 +27,11 @@ o puede ser un valor puesto a ojo.
 golpe. Funciona como un segundo boton, pero no se ha comprobado en el emulador
 si el juego hace algo distinto con el o si es solo comodidad.
 
-## Los 32 bytes que faltan en los archivos de figuras
+## Los 26 bytes que faltan en los archivos de figuras
 
-`tools/archivo_de_figuras.py` explica **20.306 de los 20.338 bytes** de
-0x707E..0xBFF0 recorriendo las cuatro tablas y sus 76 figuras. Quedan **32
-bytes en cuatro huecos**. Estan declarados como datos y no los lee nadie por
-ninguno de los caminos trazados, pero no se sabe que son.
-
-## Tres figuras que cuadran con las dos cuentas
-
-La cuenta de piezas de una figura es N o N+1 &mdash;0x5005 hace `inc b` segun
-el bit 1 del contador de cuadros&mdash;, y se resuelve mirando cual de las dos
-deja las piezas encadenadas sin hueco. En **tres** figuras (las tres del
-archivo 3 en 0x9653) cuadran las dos, asi que ahi la eleccion es la primera que
-prueba la herramienta y no una medida.
+`tools/archivo_de_figuras.py` explica **20.312 de los 20.338 bytes** de
+0x707E..0xBFF0 recorriendo las cuatro tablas y sus 76 figuras, cada una con la
+cuenta de piezas que recorre el Z80 de verdad. Quedan **26 bytes en dos
+huecos**: ocho delante de la primera tabla (0x707E) y dieciocho justo antes de
+la marca oculta de Konami (0xBFDE). Estan declarados como datos y no los lee
+nadie por ninguno de los caminos trazados, pero no se sabe que son.

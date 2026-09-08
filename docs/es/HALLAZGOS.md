@@ -2,22 +2,47 @@
 
 Lo que aparecio al desmontarlo. Cada uno con la medida al lado.
 
-## Seis rivales y solo TRES juegos de figuras
+## Seis rivales, tres archivos y una pieza escondida para la segunda vuelta
 
-Los nombres son seis y estan en una tabla de seis punteros (0x5661). Los
-**dibujos** salen de otra tabla, la de 0x52C9, y esa tiene **tres** palabras:
+Los nombres son seis y estan en una tabla de seis punteros (0x5661). Las
+**figuras** salen de otra tabla, la de 0x52C9, y esa tiene **tres** palabras:
 0x825C, 0x9670 y 0xABB4, que son las tablas de los archivos de figuras 2, 3
-y 4. 0x4F8D la indexa con `(0xE207) & 3`.
+y 4. 0x4F8D la indexa con `(0xE207) & 3`, y una cuarta palabra caeria en
+0x52CF, que ya es codigo. No se lee nunca: 0x423B fuerza el salto al siguiente
+grupo de dieciseis en cuanto el indice llega a 2.
 
-Una cuarta palabra caeria en 0x52CF, que ya es codigo. Pero no se lee nunca:
-0x423B fuerza el salto al siguiente grupo de dieciseis en cuanto
-`(0xE207) & 3` llega a 2, asi que el indice solo vale 0, 1 o 2.
+Y aun asi los seis son distintos, y SANCHESS no es RED WOLF con otro color.
+Cada figura de los tres archivos de rival lleva **una pieza de mas** de las
+que declara su cabecera: el byte de +8 dice N, pero 0x5005 hace `inc b` en el
+turno del rival &mdash;el bit 1 del contador de cuadros&mdash; y recorre N+1
+registros y N+1 punteros. La primera es la pieza de la **segunda vuelta**, y
+0x5034 (para los patrones) y 0x5187 (para los atributos de sprite) deciden que
+hacer con ella mirando (0xE207):
 
-Los tres rivales de la segunda vuelta son los tres primeros **con el color
-cambiado**: 0x526F y 0x51BE cambian el color 4 por el 0x0C cuando (0xE207)
-lleva el bit 4 puesto.
+| (0xE207) | rival | lo que 0x5034 hace con la primera pieza |
+|---|---|---|
+| bit 4 a cero | RED WOLF, M.B.ALLI, MOAI KING | se la salta (0x5048) |
+| bit 4 puesto, bit 0 a cero | SANCHESS, MOAI Jr. | la pinta **en vez de** la segunda (`ld a,002h`, 0x5040) |
+| bit 4 y bit 0 puestos | CHINA KHAN | las pinta **todas** (`inc b`, 0x5045) |
 
-![Los tres archivos de rival](../img/poses_rival_2.png)
+Asi que SANCHESS lleva el cuerpo de RED WOLF con **otra cabeza**: la pieza
+escondida del archivo 2 (0x9558) es la misma cara con el pelo hasta el cuello,
+donde 0x856E lo lleva corto. CHINA KHAN es M.B.ALLI **mas** un sprite negro
+(0xAB2E, color 1): la coleta que le cuelga de la cabeza. Y MOAI Jr. cambia el
+sprite vacio de MOAI KING (0xBF7B, color 0) por siete pixeles negros en la
+cara (0xBF7D), y encima cambia de color: 0x526F y 0x51BE convierten el color 4
+en 0x0C &mdash;el azul oscuro en verde&mdash; solo cuando `(0xE207) & 3` vale
+2 y el bit 4 esta puesto. El moai es el unico que cambia de color.
+
+Nada de esto es solo una lectura del codigo. La VRAM de los seis
+cuadrilateros, volcada de openMSX con cada rival impuesto en (0xE207), sale
+con **cero diferencias** en los doce atributos de sprite, en los bytes de
+patron de cada sprite en pantalla y en las casillas del cuerpo de los dos
+boxeadores ([En el emulador](EN-EL-EMULADOR.html)).
+
+![RED WOLF](../img/poses_rival_1.png)
+
+![SANCHESS: las mismas diecinueve poses, con el pelo hasta el cuello](../img/poses_rival_4.png)
 
 ## Pegar cansa
 

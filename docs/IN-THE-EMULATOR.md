@@ -32,15 +32,31 @@ the state of the game, so it can be said **what** the comparison is against.
 presentacion    colour 0  patterns 0  names 0   TOTAL 0
 menu            colour 0  patterns 0  names 0   TOTAL 0
 opponent 1      colour 0  patterns 0  names 0   TOTAL 0
+  boxers        attributes 0  patterns 0  body tiles 0 (50 tiles)   TOTAL 0
   (with figures) colour 0  patterns 0  names 0   TOTAL 0
 opponents 2..6  colour 0  patterns 0  names 0   TOTAL 0
+  boxers        attributes 0  patterns 0  body tiles 0   TOTAL 0
 ---- 8 screens, 0 bytes different
 ```
 
+## The boxers are compared on their own
+
+The interrupt hook rebuilds the sprites every frame, so comparing the whole
+sprite tables would only measure the delay of the dump. But at the moment of
+the dump both boxers are in the action and the column the `.txt` records, so
+`tools/coteja_vram.py` builds them with those &mdash;taking each one's starting
+pattern from the dump itself, because they alternate with the frame
+counter&mdash; and compares the **twelve sprite attributes**, the **32 pattern
+bytes of every sprite on screen** and the **body tiles** the name table has in
+rows 8 to 15. That is what tells the six opponents apart, and until it was
+added the comparison was blind to it: the first version of this site said the
+second round was the first three opponents with the colour swapped, and it
+was not.
+
 ## What is NOT compared, and why
 
-- **Sprite patterns and their attributes.** The interrupt hook rebuilds them
-  every frame, so comparing them would only measure the delay of the dump.
+- **The rest of the sprite tables.** What the attributes do not point at is
+  left over from earlier frames.
 - **The tiles the scoreboard and the clock rewrite.** They are declared one by
   one in `tools/coteja_vram.py`, with the routine that writes them alongside.
 - **The figure area, except on the first bout.** The first one starts with that

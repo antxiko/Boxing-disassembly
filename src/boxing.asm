@@ -2620,7 +2620,8 @@ suma_las_tarjetas:
 ; Los boxeadores se pintan de dos maneras a la vez: el cuerpo son
 ; CASILLAS de la pantalla, que 0x4F66 saca de los archivos de figuras, y
 ; los guantes y la cabeza son SPRITES, que monta 0x5178. La cabecera de
-; una figura -17 + 5N- esta medida arriba, en las notas de los archivos.
+; una figura -17 + 5M, con M = N para el jugador y N+1 para el rival-
+; esta medida arriba, en las notas de los archivos.
 ; ----------------------------------------------------------------------
 prepara_el_dibujo:
 	ld a,(0e003h)		;4f45   ; el contador de cuadros
@@ -2736,8 +2737,8 @@ L_4FB5:
 	ld a,(0e003h)		;4ffe   ; el contador de cuadros
 	rrca			;5001   ; el bit 1, al acarreo
 	rrca			;5002
-	jr nc,L_5006		;5003   ; uno de cada cuatro...
-	inc b			;5005   ; ...lleva una pieza mas
+	jr nc,L_5006		;5003   ; en el turno del rival -bit 1 puesto-...
+	inc b			;5005   ; ...la figura lleva un registro mas: la pieza de la segunda vuelta
 L_5006:
 	inc hl			;5006   ; saltarse la cuenta
 L_5007:
@@ -2767,21 +2768,21 @@ L_502A:
 	ex af,af'			;502f   ; el desplazamiento de color, a A'
 	xor a			;5030
 	ex af,af'			;5031
-	jr z,L_504A		;5032   ; sin desplazar, directo
-	ld a,(0e207h)		;5034   ; (0xE207)
-	bit 4,a		;5037   ; el bit 4, que sale del menu
+	jr z,L_504A		;5032   ; el jugador: todas las piezas seguidas
+	ld a,(0e207h)		;5034   ; el rival: (0xE207) decide que se hace con la primera pieza
+	bit 4,a		;5037   ; el bit 4: la segunda vuelta
 	jr z,L_5048		;5039
-	bit 0,a		;503b   ; y el bit 0
+	bit 0,a		;503b   ; y el bit 0: CHINA KHAN
 	jr nz,L_5045		;503d
 	ex af,af'			;503f
-	ld a,002h		;5040   ; dos
+	ld a,002h		;5040   ; SANCHESS y MOAI Jr.: tras la primera pieza se salta un puntero, la primera SUSTITUYE a la segunda
 	ex af,af'			;5042
 	jr L_504A		;5043
 L_5045:
-	inc b			;5045   ; una pieza mas
+	inc b			;5045   ; CHINA KHAN las pinta todas: la primera es su coleta
 	jr L_504A		;5046
 L_5048:
-	inc hl			;5048   ; y si no, se salta el primer puntero
+	inc hl			;5048   ; y en la primera vuelta la primera pieza se salta
 	inc hl			;5049
 L_504A:
 	push hl			;504a   ; pieza por pieza
@@ -2945,8 +2946,8 @@ L_512C:
 	ld a,(0e003h)		;513e   ; el contador de cuadros
 	rrca			;5141   ; el bit 1, al acarreo
 	rrca			;5142
-	jr c,L_5146		;5143   ; uno de cada cuatro...
-	inc b			;5145   ; ...lleva una pieza mas
+	jr c,L_5146		;5143   ; en el turno del rival...
+	inc b			;5145   ; ...un registro mas, el de la segunda vuelta
 L_5146:
 	inc hl			;5146
 L_5147:
@@ -3000,21 +3001,21 @@ monta_los_sprites_de_una_figura:
 	push af			;5182   ; el desplazamiento, de vuelta a A'
 	ex af,af'			;5183
 	pop af			;5184
-	jr z,L_519E		;5185   ; sin desplazar, directo
-	ld a,(0e207h)		;5187   ; (0xE207), que sale del menu
-	bit 4,a		;518a   ; el bit 4, que sale del menu
+	jr z,L_519E		;5185   ; el jugador: todos los registros seguidos
+	ld a,(0e207h)		;5187   ; el rival: (0xE207) decide, igual que en 0x5034
+	bit 4,a		;518a   ; el bit 4: la segunda vuelta
 	jr z,L_519B		;518c
-	bit 0,a		;518e   ; y el bit 0
+	bit 0,a		;518e   ; y el bit 0: CHINA KHAN
 	jr nz,L_5198		;5190
 	exx			;5192
-	ld l,003h		;5193   ; tres
+	ld l,003h		;5193   ; SANCHESS y MOAI Jr.: tras el primer registro se salta el segundo
 	exx			;5195
 	jr L_519E		;5196
 L_5198:
-	inc b			;5198   ; un sprite mas
+	inc b			;5198   ; CHINA KHAN: un sprite mas, la coleta
 	jr L_519E		;5199
 L_519B:
-	inc hl			;519b   ; y si no, se salta el primer registro
+	inc hl			;519b   ; primera vuelta: el primer registro se salta
 	inc hl			;519c
 	inc hl			;519d
 L_519E:
@@ -3041,14 +3042,14 @@ L_51A6:
 	pop af			;51b9
 	cp 030h		;51ba   ; por debajo del patron 0x30, el color tal cual
 	jr c,L_51D0		;51bc
-	ld a,(0e207h)		;51be   ; (0xE207)
+	ld a,(0e207h)		;51be   ; y de los del rival solo MOAI Jr.: bits 4 y 1 de (0xE207)
 	bit 4,a		;51c1
 	jr z,L_51D0		;51c3
 	bit 1,a		;51c5
 	jr z,L_51D0		;51c7
-	ld a,(hl)			;51c9   ; el color 4...
+	ld a,(hl)			;51c9   ; su color 4, el azul del moai...
 	cp 004h		;51ca
-	ld a,00ch		;51cc   ; ...se cambia por el 0x0C
+	ld a,00ch		;51cc   ; ...se cambia por el 0x0C, verde
 	jr z,L_51D1		;51ce
 L_51D0:
 	ld a,(hl)			;51d0
@@ -3172,8 +3173,11 @@ DATA_nueve_ternas:
 
 ; ----------------------------------------------------------------------
 ; ----------------------------------------------------------------------
-; El cambio de color, que solo entra con (0xE207) puesto de cierta manera
-; y en la mitad de los cuadros: el color 4 pasa a 0x0C, tinta y fondo.
+; El cambio de color de MOAI Jr. En el turno del rival -bit 1 del
+; contador-, con el bit 4 de (0xE207) puesto y (0xE207) & 3 == 2, el
+; color 4 -el azul del moai- pasa a 0x0C, verde, tinta y fondo. Es lo
+; unico que distingue el cuerpo de MOAI Jr. del de MOAI KING; la cara
+; se la cambia 0x5034 con la pieza de la segunda vuelta.
 ; ----------------------------------------------------------------------
 saca_el_byte_con_el_color_cambiado:
 	ld a,(0e003h)		;526f   ; el contador de cuadros
@@ -3183,7 +3187,7 @@ saca_el_byte_con_el_color_cambiado:
 	bit 4,a		;5279   ; el bit 4
 	jr z,saca_el_byte_tal_cual		;527b
 	and 003h		;527d   ; los dos de abajo
-	cp 002h		;527f   ; con el 2 exacto se cambia
+	cp 002h		;527f   ; solo con el 2: el archivo del moai, o sea MOAI Jr.
 	jr nz,saca_el_byte_tal_cual		;5281
 	ld a,(de)			;5283   ; el byte
 	and 00fh		;5284   ; el fondo
@@ -7523,34 +7527,25 @@ DATA_guiones_9633:
 	defb 0f0h,0f8h,0fch,0feh,0feh,0ffh,0efh,0a7h,007h,037h,067h,047h,007h,027h,0edh,09ch	; 9643  .........7gG.'..
 
 ; ----------------------------------------------------------------------
-; DATOS cabecera_de_la_figura_9653: Archivo 4: cuatro punteros de fondo, 1
-;   piezas de tres bytes y sus 1 punteros; mide 17 + 5*1 = 22
-;   0x9653..0x9669  (22 bytes)
+; DATOS cabecera_de_la_figura_9653: La figura 18 de los archivos 2, 3 y 4, la
+;   vacia: cuatro punteros de fondo a 0x966E, 1 pieza declarada pero 2
+;   registros -el de mas que el rival lleva siempre-, los ocho de disposicion
+;   y sus 2 punteros, los dos a 0x966E; mide 17 + 5*2 = 27
+;   0x9653..0x966e  (27 bytes)
 DATA_cabecera_de_la_figura_9653:
 	defb 06eh,096h,06eh,096h,06eh,096h,06eh,096h	; 9653  n.n.n.n.
 	defb 001h,0a0h,000h,000h,0a0h,000h,000h,080h	; 965b  ........
-	defb 080h,080h,080h,080h,080h,080h	; 9663
+	defb 080h,080h,080h,080h,080h,080h,080h,06eh	; 9663  .......n
+	defb 096h,06eh,096h	; 966b
 
 ; ----------------------------------------------------------------------
-; DATOS pieza_vacia_del_archivo_3 (tramo): El puntero 0x966E repetido y la
-;   pieza que apunta: `00 20`, o sea treinta y dos ceros. Un sprite en blanco
-;   0x9669..0x966e  (5 bytes)  de 0x9669..0x9670 (7 bytes)
+; DATOS pieza_vacia_del_archivo_3: `00 20`: leido como guion de figura es un
+;   0x00, se acabo, y leido como pieza son treinta y dos ceros, un sprite en
+;   blanco. Los cuatro guiones de fondo y las dos piezas de 0x9653 apuntan
+;   aqui
+;   0x966e..0x9670  (2 bytes)
 DATA_pieza_vacia_del_archivo_3:
-	defb 080h,06eh,096h,06eh,096h	; 9669
-
-; ----------------------------------------------------------------------
-; DATOS guiones_966E: 1 guiones de figura encajados: los que comparten cola
-;   empiezan dentro del anterior
-;   0x966e..0x966f  (1 bytes)
-DATA_guiones_966E:
-	defb 000h	; 966e
-
-; ----------------------------------------------------------------------
-; DATOS pieza_vacia_del_archivo_3 (tramo): El puntero 0x966E repetido y la
-;   pieza que apunta: `00 20`, o sea treinta y dos ceros. Un sprite en blanco
-;   0x966f..0x9670  (1 bytes)  de 0x9669..0x9670 (7 bytes)
-DATA_pieza_vacia_del_archivo_3_966F:
-	defb 020h	; 966f
+	defb 000h,020h	; 966e
 
 ; ----------------------------------------------------------------------
 ; DATOS punteros_del_archivo_3: Las 19 figuras del archivo 3. La tabla la

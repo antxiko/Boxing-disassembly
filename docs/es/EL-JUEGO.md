@@ -35,7 +35,9 @@ no sale de la tabla: lo pone 0x55A0 aparte.
 
 ![MOAI KING](../img/combate_3.png)
 
-Los **dibujos**, en cambio, son tres. Ver [Hallazgos](HALLAZGOS.html).
+Las **figuras** salen de tres archivos, y aun asi los seis son distintos:
+cada archivo esconde una pieza que solo pinta la segunda vuelta. Ver
+[Hallazgos](HALLAZGOS.html).
 
 ## El asalto
 
@@ -54,8 +56,12 @@ contador de cuadros.
 ![Las diecinueve poses del jugador](../img/poses_jugador.png)
 
 Cada boxeador tiene **diecinueve** poses. El cuerpo son **casillas** que se
-redefinen cada cuadro; la cabeza y los guantes son **sprites** de 16x16. Las
-poses van desde la guardia hasta el derribo, y la ultima es la de la victoria,
-con los dos guantes en alto.
+redefinen cada cuadro; la cabeza, el pelo y los guantes son **sprites** de
+16x16. Las hojas se montan igual que el cuadrilatero: las casillas colocadas
+con los ocho bytes de disposicion de cada figura y los sprites encima, con las
+piezas que dice (0xE207). Las poses van desde la guardia hasta el derribo, y
+la ultima es la de la victoria, con los dos guantes en alto.
 
-![El tercer archivo es un moai](../img/poses_rival_3.png)
+![MOAI KING](../img/poses_rival_3.png)
+
+![MOAI Jr.: el mismo archivo con el color 4 cambiado por el 0x0C](../img/poses_rival_6.png)

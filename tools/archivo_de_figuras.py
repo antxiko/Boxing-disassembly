@@ -9,18 +9,27 @@ LA FORMA DE UNA FIGURA, sacada de 0x4F87..0x505C leyendo el codigo:
 
     +0            cuatro punteros (8 B) a los cuatro guiones del fondo, que
                   0x4FC5 y 0x4FD1 vuelcan en patrones y en colores
-    +8            N, cuantas piezas moviles lleva la figura
-    +9            N registros de TRES bytes (los lee el bucle de 0x5007, que
-                  avanza de tres en tres)
-    +9+3N         ocho bytes que 0x500C se salta con `ld a,008h`
-    +17+3N        N punteros (2N B) a los guiones de las piezas, que el bucle
+    +8            N, la cuenta de piezas moviles que declara la figura
+    +9            M registros de TRES bytes -fila, columna y color del
+                  sprite-, que el bucle de 0x5007 recorre de tres en tres.
+                  M = N en el archivo del jugador y M = N+1 en los tres del
+                  rival: 0x4FFE (y 0x513E) hace `inc b` cuando el bit 1 del
+                  contador de cuadros esta puesto, y ese bit es el que
+                  reparte los turnos (0x4F8A): pares el jugador, impares el
+                  rival. La pieza de mas es la de la SEGUNDA VUELTA, ver
+                  pantallas.piezas_que_se_pintan
+    +9+3M         ocho bytes de disposicion, que 0x500C se salta con
+                  `ld a,008h` y 0x51FF lee para colocar las casillas
+    +17+3M        M punteros (2M B) a los guiones de las piezas, que el bucle
                   de 0x504A recorre uno a uno
-    +17+5N        aqui empiezan los guiones
+    +17+5M        aqui empiezan los guiones
 
-O sea que la cabecera mide 17 + 5N bytes, y eso NO es una suposicion: para la
-figura 0 del primer archivo da 0x721E + 29 = 0x723B, que es exactamente donde
-empiezan los cuatro punteros de las piezas, y 0x723B + 8 = 0x7243, que es
-exactamente el primer guion.
+O sea que la cabecera mide 17 + 5M bytes, y eso NO es una suposicion: para la
+figura 0 del primer archivo (M = N = 4) da 0x721E + 29 = 0x723B, que es
+exactamente donde empiezan los cuatro punteros de las piezas, y 0x723B + 8 =
+0x7243, que es exactamente el primer guion. Y en los tres archivos de rival
+las 57 figuras cierran con N+1 y NO con N: con N la tabla de punteros se lee
+tres bytes desplazada y se sale del archivo a la primera.
 
 Cada tabla de archivo se cierra con la regla de siempre -la entrada mas baja
 por delante marca el final-, y las cuatro dan 19 entradas clavadas.
@@ -33,7 +42,6 @@ sys.path.insert(0, __file__.rsplit("/", 1)[0] if "/" in __file__ else ".")
 from formatos import figura, pieza                   # noqa: E402
 
 ORG = 0x4000
-AMBIGUAS = []
 TABLAS = (0x7086, 0x825C, 0x9670, 0xABB4)
 
 
@@ -52,39 +60,38 @@ def entradas_de_la_tabla(rom, t):
     return [palabra(rom, t + i * 2) for i in range(n)]
 
 
-def piezas_de_la_figura(rom, p):
-    """Cuantas piezas lleva la figura, MEDIDO y no supuesto.
+def piezas_de_la_figura(rom, p, rival):
+    """Cuantas piezas lleva la figura de verdad, y donde estan sus punteros.
 
-    El byte de +8 dice N, pero el bucle de 0x5007 puede recorrer una pieza mas:
-    0x5005 hace `inc b` cuando el bit 1 del contador de cuadros esta puesto.
-    Asi que se prueban las dos y se elige la que CIERRA: las piezas de una
-    figura son de 32 bytes cada una y van pegadas, asi que la buena es la que
-    deja las N (o N+1) piezas encadenadas sin hueco.
+    El byte de +8 dice N, pero no es la cuenta que recorre el Z80: 0x4FFE (y
+    0x513E para los atributos) hace `inc b` cuando el bit 1 del contador de
+    cuadros esta puesto, y ese bit es el que reparte los turnos -en los pares
+    se pinta al jugador y en los impares al rival, 0x4F8A-. Asi que las
+    figuras del archivo del jugador llevan N registros y N punteros, y las de
+    los tres archivos de rival llevan N+1: la pieza de mas es la que 0x5034
+    reserva para la segunda vuelta (pantallas.piezas_que_se_pintan).
+
+    Y se comprueba que esa cuenta CIERRA: las piezas son de 32 bytes y van
+    pegadas, asi que con la cuenta buena los punteros caen dentro del archivo
+    y cada pieza acaba antes del final. Con la otra no.
     """
     n = rom[p + 8 - ORG]
-    buenas = []
-    for m in (n, n + 1):
-        base = p + 17 + 3 * m
-        ptr = [palabra(rom, base + 2 * i) for i in range(m)]
-        if not ptr or not all(0x707E <= x < 0xBFF0 for x in ptr):
-            continue
-        try:
-            if any(pieza(rom, x)[0] > 0xBFF0 for x in ptr):
-                continue
-        except ValueError:
-            continue
-        buenas.append((m, ptr))
-    if not buenas:
-        raise ValueError("la figura de 0x%04X no cierra con %d ni con %d piezas"
-                         % (p, n, n + 1))
-    if len(buenas) > 1:
-        AMBIGUAS.append(p)
-    return buenas[0][0], buenas[0][1], 0
+    m = n + 1 if rival else n
+    base = p + 17 + 3 * m
+    ptr = [palabra(rom, base + 2 * i) for i in range(m)]
+    if not ptr or not all(0x707E <= x < 0xBFF0 for x in ptr):
+        raise ValueError("la figura de 0x%04X no cierra con %d piezas"
+                         % (p, m))
+    for x in ptr:
+        if pieza(rom, x)[0] > 0xBFF0:
+            raise ValueError("la pieza 0x%04X de la figura 0x%04X se sale del "
+                             "archivo" % (x, p))
+    return m, ptr, 0
 
 
-def recorre_una_figura(rom, p, marca):
+def recorre_una_figura(rom, p, marca, rival):
     """Marca la cabecera, los cuatro guiones y las piezas de una figura."""
-    m, ptr, fin_piezas = piezas_de_la_figura(rom, p)
+    m, ptr, fin_piezas = piezas_de_la_figura(rom, p, rival)
     for k in range(17 + 5 * m):
         marca(p + k)
     guiones = [palabra(rom, p + 2 * i) for i in range(4)]
@@ -115,16 +122,12 @@ def main():
               % (t, len(ent), t + len(ent) * 2))
         for i, p in enumerate(ent):
             try:
-                n, g = recorre_una_figura(rom, p, marca)
+                n, g = recorre_una_figura(rom, p, marca, t != TABLAS[0])
             except ValueError as e:
                 print("   %2d  figura 0x%04X  NO CIERRA: %s" % (i, p, e))
                 continue
             print("   %2d  figura 0x%04X  %d piezas  cabecera %d B  guiones %s"
                   % (i, p, n, 17 + 5 * n, " ".join("%04X" % x for x in g)))
-    if AMBIGUAS:
-        print("")
-        print("OJO: %d figuras cuadran con las DOS cuentas de piezas: %s"
-              % (len(AMBIGUAS), " ".join("%04X" % x for x in AMBIGUAS)))
     ini, fin = 0x707E, 0xBFF0
     huecos, s = [], None
     for a in range(ini, fin):

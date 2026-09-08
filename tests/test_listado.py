@@ -94,6 +94,15 @@ def trozo(dire, n):
     return fuera
 
 
+def instruccion(dire):
+    """La instruccion que el listado pone en una direccion, sin comentario."""
+    for ln in lineas_del_asm():
+        m = re.match(r"^\t([a-z].*?)\t+;%04x\b" % dire, ln)
+        if m:
+            return " ".join(m.group(1).split())
+    raise AssertionError("0x%04X no es una instruccion del listado" % dire)
+
+
 def rom_parcial():
     """Una imagen de 32 KB con los bytes de datos puestos en su sitio.
 
@@ -322,13 +331,65 @@ class TestLosNombres(unittest.TestCase):
         n = trozo(0x56AF, 1)[0] & 0x7F
         self.assertEqual(texto(trozo(0x56B0, n)), "RYU")
 
-    def test_seis_nombres_pero_solo_tres_juegos_de_figuras(self):
-        """0x4F8D indexa con (0xE207) & 3, y solo hay tres palabras: los tres
-        rivales de la segunda vuelta son los tres primeros con otro color."""
+    def test_seis_nombres_y_tres_archivos_de_figuras(self):
+        """0x4F8D indexa con (0xE207) & 3, y solo hay tres palabras: cada
+        archivo sirve a dos rivales, uno por vuelta."""
         p = trozo(0x52C9, 6)
         tablas = [p[2 * i] | (p[2 * i + 1] << 8) for i in range(3)]
         self.assertEqual(tablas, [0x825C, 0x9670, 0xABB4])
         self.assertEqual(len(self.RIVALES), 2 * len(tablas))
+
+    def test_las_figuras_de_rival_llevan_una_pieza_de_mas(self):
+        """0x4FFE hace `inc b` en los turnos del rival, asi que sus figuras
+        llevan N+1 registros y N+1 punteros donde el byte de +8 dice N. Y no
+        es una eleccion: con la cuenta equivocada los punteros se salen del
+        archivo, en las 57 de rival y en las 19 del jugador. Solo la figura
+        vacia de 0x9653 -una pieza fuera de pantalla- cierra con las dos."""
+        import archivo_de_figuras as A
+        rom = rom_parcial()
+        for t in A.TABLAS:
+            rival = t != 0x7086
+            for p in A.entradas_de_la_tabla(rom, t):
+                n = rom[p + 8 - ORG]
+                m, ptr, _ = A.piezas_de_la_figura(rom, p, rival)
+                self.assertEqual(m, n + 1 if rival else n)
+                self.assertEqual(len(ptr), m)
+                if p == 0x9653:
+                    continue
+                with self.assertRaises(ValueError, msg="0x%04X cierra tambien "
+                                       "con la otra cuenta" % p):
+                    A.piezas_de_la_figura(rom, p, not rival)
+
+    def test_la_segunda_vuelta_elige_las_piezas_con_los_bits_4_y_0(self):
+        """0x5034 y 0x5187 leen (0xE207): `bit 4,a` decide la vuelta y
+        `bit 0,a` el rival. `ld a,002h` (0x5040) y `ld l,003h` (0x5193) saltan
+        la segunda pieza tras la primera -SANCHESS y MOAI Jr.-, y el `inc b`
+        de 0x5045 y 0x5198 pinta una mas: CHINA KHAN."""
+        for a in (0x5034, 0x5187):
+            self.assertEqual(instruccion(a), "ld a,(0e207h)")
+            self.assertEqual(instruccion(a + 3), "bit 4,a")
+            self.assertEqual(instruccion(a + 7), "bit 0,a")
+        self.assertEqual(instruccion(0x5040), "ld a,002h")
+        self.assertEqual(instruccion(0x5193), "ld l,003h")
+        self.assertEqual(instruccion(0x5045), "inc b")
+        self.assertEqual(instruccion(0x5198), "inc b")
+        # y la pieza de mas viene de aqui: el `inc b` del turno del rival
+        self.assertEqual(instruccion(0x5005), "inc b")
+        self.assertEqual(instruccion(0x5145), "inc b")
+
+    def test_solo_moai_jr_cambia_el_azul_por_el_verde(self):
+        """0x527D pide (0xE207) & 3 == 2 -el archivo del moai- y 0x51C5 el
+        bit 1; y en los dos sitios el color 4 pasa a 0x0C."""
+        self.assertEqual(instruccion(0x527D), "and 003h")
+        self.assertEqual(instruccion(0x527F), "cp 002h")
+        self.assertEqual(instruccion(0x5287), "cp 004h")
+        self.assertEqual(instruccion(0x528B), "ld h,00ch")
+        self.assertEqual(instruccion(0x5290), "cp 040h")
+        self.assertEqual(instruccion(0x5294), "ld a,0c0h")
+        self.assertEqual(instruccion(0x51C1), "bit 4,a")
+        self.assertEqual(instruccion(0x51C5), "bit 1,a")
+        self.assertEqual(instruccion(0x51CA), "cp 004h")
+        self.assertEqual(instruccion(0x51CC), "ld a,00ch")
 
 
 class TestLosRotulos(unittest.TestCase):
@@ -530,11 +591,15 @@ class TestLaWeb(unittest.TestCase):
                         faltan.append((fn, ruta))
         self.assertEqual(faltan, [], "imagenes que no existen: %s" % faltan[:5])
 
-    def test_las_catorce_laminas_estan_dibujadas(self):
+    def test_las_diecisiete_laminas_estan_dibujadas(self):
+        """Seis cuadrilateros, seis hojas de rival -una por rival, no una por
+        archivo-, la del jugador y las cuatro de presentacion y fuente."""
         img = os.path.join(DOCS, "img")
         self.assertTrue(os.path.isdir(img), "no hay docs/img: pasa make imagenes")
         pngs = [f for f in os.listdir(img) if f.endswith(".png")]
-        self.assertEqual(len(pngs), 14, "hay %d laminas y son 14" % len(pngs))
+        self.assertEqual(len(pngs), 17, "hay %d laminas y son 17" % len(pngs))
+        for r in range(1, 7):
+            self.assertIn("poses_rival_%d.png" % r, pngs)
         for f in pngs:
             self.assertGreater(os.path.getsize(os.path.join(img, f)), 500,
                                "%s pesa demasiado poco para ser un dibujo" % f)

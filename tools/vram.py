@@ -208,13 +208,26 @@ def escribe_seguidas(v, destino, primera, cuantas):
     return destino + 0x20
 
 
-def vuelca_guion(rom, v, p, destino=None):
-    """`vuelca_un_guion` (0x5060), el de las piezas de fondo de una figura.
+def cambia_4_por_C(b):
+    """`saca_el_byte_con_el_color_cambiado` (0x526F): el fondo que valga 4
+    pasa a 0x0C, y la tinta que valga 4 tambien. Del azul oscuro al verde."""
+    fondo, tinta = b & 0x0F, b & 0xF0
+    if fondo == 0x04:
+        fondo = 0x0C
+    if tinta == 0x40:
+        tinta = 0xC0
+    return tinta | fondo
+
+
+def vuelca_guion(rom, v, p, destino=None, cambia_color=False):
+    """`vuelca_un_guion` (0x5060), el de los colores del cuerpo de una figura.
 
     Mismo formato que `descomprime` pero sin la marca de cambio de sitio: la
-    cuenta a cero acaba y ya. El cambio de color de 0x526F no se aplica aqui
-    (solo entra con (0xE207) puesto de cierta manera y en la mitad de los
-    cuadros).
+    cuenta a cero acaba y ya. Cada byte -los seguidos en 0x506E y el repetido
+    en 0x5079- pasa por `saca_el_byte_con_el_color_cambiado` (0x526F), que
+    solo cambia algo en el turno del rival, con el bit 4 de (0xE207) puesto y
+    (0xE207) & 3 == 2: o sea, para MOAI Jr. y para nadie mas. Eso es
+    `cambia_color`, y es lo que lo pone verde donde MOAI KING es azul.
     """
     if destino is not None:
         v.setwrt(destino)
@@ -226,10 +239,13 @@ def vuelca_guion(rom, v, p, destino=None):
         p += 1
         if a != c:                           # bit 7 puesto: bytes seguidos
             for _ in range(c):
-                v.pon(rom.b(p))
+                b = rom.b(p)
+                v.pon(cambia_4_por_C(b) if cambia_color else b)
                 p += 1
         else:
             b = rom.b(p)
+            if cambia_color:
+                b = cambia_4_por_C(b)
             p += 1
             for _ in range(c):
                 v.pon(b)

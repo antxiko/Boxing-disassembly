@@ -91,15 +91,16 @@ audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
 <table><tr><th>opcion</th><th>byte</th><th>bit 0</th><th>bit 4</th></tr><tr><td>1PLAYER GAME A</td><td>0x40</td><td></td><td></td></tr><tr><td>1PLAYER GAME B</td><td>0x50</td><td></td><td>dura</td></tr><tr><td>2PLAYERS GAME A</td><td>0x61</td><td>dos juegan</td><td></td></tr><tr><td>2PLAYERS GAME B</td><td>0x71</td><td>dos juegan</td><td>dura</td></tr></table>
 <p>El <b>bit 0</b> es el que decide si la maquina juega: con el puesto, 0x47C0 se salta <code>decide_la_maquina</code> y los dos boxeadores leen su mando. El <b>bit 4</b> elige la variante dura, que 0x42F5 traduce en (0xE206) = 3 y (0xE207) = 0x10.</p>
 <h2 id="los-seis-rivales">Los seis rivales</h2>
-<p><img src="../img/combate_1.png?v=c4fdfbc0" alt="RED WOLF"></p>
+<p><img src="../img/combate_1.png?v=d304138f" alt="RED WOLF"></p>
 <p>Los nombres salen de una tabla de seis punteros en 0x5661, y se leen con la fuente del propio cartucho: <b>RED&amp;middot;WOLF</b>, <b>M.B.ALLI</b>, <b>MOAI&amp;middot;KING</b>, <b>SANCHESS</b>, <b>CHINA&amp;middot;KHAN</b> y <b>MOAI&amp;middot;Jr.</b> El jugador se llama siempre <b>RYU</b> (0x56AF), y su nombre no sale de la tabla: lo pone 0x55A0 aparte.</p>
-<p><img src="../img/combate_3.png?v=d0fa3b8b" alt="MOAI KING"></p>
-<p>Los <b>dibujos</b>, en cambio, son tres. Ver <a href="HALLAZGOS.html">Hallazgos</a>.</p>
+<p><img src="../img/combate_3.png?v=e374102c" alt="MOAI KING"></p>
+<p>Las <b>figuras</b> salen de tres archivos, y aun asi los seis son distintos: cada archivo esconde una pieza que solo pinta la segunda vuelta. Ver <a href="HALLAZGOS.html">Hallazgos</a>.</p>
 <h2 id="el-asalto">El asalto</h2>
 <p>Tres minutos, contados en cuatro casillas ASCII de (0xE212) a (0xE215) que arrancan en 3:01 y a la primera bajada quedan en <b>3:00</b>. Tres asaltos por combate: (0xE210) los cuenta y 0x57C7 lo sube.</p>
 <p>Debajo, la tira de <b>veintidos casillas</b> de la fila 22 es una sola barra que los dos boxeadores se comen por los extremos: la del de la izquierda desde el principio y la del de la derecha desde el final (0x5448). Cuando el castigo pasa del nivel 6, las dos casillas del borde <b>parpadean</b> con el bit 4 del contador de cuadros.</p>
 <h2 id="los-boxeadores">Los boxeadores</h2>
-<p><img src="../img/poses_jugador.png?v=384ee9b7" alt="Las diecinueve poses del jugador"></p>
-<p>Cada boxeador tiene <b>diecinueve</b> poses. El cuerpo son <b>casillas</b> que se redefinen cada cuadro; la cabeza y los guantes son <b>sprites</b> de 16x16. Las poses van desde la guardia hasta el derribo, y la ultima es la de la victoria, con los dos guantes en alto.</p>
-<p><img src="../img/poses_rival_3.png?v=f4bd40b5" alt="El tercer archivo es un moai"></p>
+<p><img src="../img/poses_jugador.png?v=5dcb6a70" alt="Las diecinueve poses del jugador"></p>
+<p>Cada boxeador tiene <b>diecinueve</b> poses. El cuerpo son <b>casillas</b> que se redefinen cada cuadro; la cabeza, el pelo y los guantes son <b>sprites</b> de 16x16. Las hojas se montan igual que el cuadrilatero: las casillas colocadas con los ocho bytes de disposicion de cada figura y los sprites encima, con las piezas que dice (0xE207). Las poses van desde la guardia hasta el derribo, y la ultima es la de la victoria, con los dos guantes en alto.</p>
+<p><img src="../img/poses_rival_3.png?v=7d38a2f9" alt="MOAI KING"></p>
+<p><img src="../img/poses_rival_6.png?v=e12bdb98" alt="MOAI Jr.: el mismo archivo con el color 4 cambiado por el 0x0C"></p>
 <footer><p><em>Konami's Boxing</em> lo publico Konami para MSX en 1985; su numero de catalogo es RC-736 y son 32 KB. Todos los derechos sobre el juego siguen siendo de sus titulares. Este trabajo es de preservacion, estudio y documentacion, y la imagen del cartucho no se distribuye.</p></footer></div>

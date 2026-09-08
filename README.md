@@ -45,12 +45,15 @@ in Python the same decompressors, figure builders and sprite painters the Z80
 runs. And that is not an opinion: `make vram` subtracts them from the VRAM
 openMSX really holds, and the eight screens dumped —the intro, the title and
 the six rings— come out with **zero** differences in colour, patterns and the
-768 tiles of the screen.
+768 tiles of the screen, and in the six rings also in the sprites and the body
+tiles of both boxers.
 
 ## What turned up
 
-- **Six opponents and only three sets of figures.** The three of the second
-  round are the first three with the colour swapped.
+- **Six opponents from three figure archives, and still six looks.** Every
+  opponent figure hides one piece that only the second round paints:
+  SANCHESS's long hair, CHINA KHAN's pigtail, MOAI Jr.'s face. Only the moai
+  changes colour.
 - **The scorecard is kept upside down**: it adds up faults and finishes with
   `10 - faults`, the ten-point must system of real boxing.
 - **Throwing a punch tires you**, and the punch only lands on the seventh and

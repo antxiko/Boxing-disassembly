@@ -11,18 +11,22 @@ direccion o a una cuenta, no entra.
 
 HALLAZGOS = {
     "es": [
-        ("Seis rivales y solo TRES juegos de figuras",
+        ("Seis rivales, tres archivos y una pieza escondida",
          "<p>Los nombres salen de una tabla de seis punteros en 0x5661: "
          "RED&middot;WOLF, M.B.ALLI, MOAI&middot;KING, SANCHESS, "
-         "CHINA&middot;KHAN y MOAI&middot;Jr. Los <b>dibujos</b>, en cambio, "
+         "CHINA&middot;KHAN y MOAI&middot;Jr. Las <b>figuras</b>, en cambio, "
          "salen de una tabla de <b>tres</b> palabras en 0x52C9 &mdash;0x825C, "
          "0x9670 y 0xABB4&mdash; que 0x4F8D indexa con "
-         "<code>(0xE207) &amp; 3</code>. La cuarta palabra caeria dentro del "
-         "codigo, pero no se lee nunca: 0x423B fuerza el salto al siguiente "
-         "grupo de dieciseis en cuanto el indice llega a 2.</p>"
-         "<p>Los tres rivales de la segunda vuelta son los tres primeros "
-         "<b>con el color cambiado</b>: 0x526F y 0x51BE cambian el color 4 "
-         "por el 0x0C cuando (0xE207) lleva el bit 4 puesto.</p>"),
+         "<code>(0xE207) &amp; 3</code>.</p>"
+         "<p>Y aun asi los seis son distintos: cada figura de rival lleva "
+         "<b>una pieza de mas</b> de las que declara &mdash;0x5005 hace "
+         "<code>inc b</code> en el turno del rival&mdash; y 0x5034 solo la "
+         "pinta en la segunda vuelta: en SANCHESS <b>en vez de</b> la cabeza "
+         "de RED WOLF (el pelo hasta el cuello), en CHINA KHAN <b>ademas</b> "
+         "de la de M.B.ALLI (la coleta) y en MOAI Jr. en vez del sprite vacio "
+         "de MOAI KING. Y solo al moai le cambian 0x526F y 0x51BE el color 4 "
+         "por el 0x0C: del azul al verde. Cotejado contra la VRAM del "
+         "emulador, sprites incluidos, a cero.</p>"),
         ("Pegar cansa, y el golpe solo toca en dos cuadros",
          "<p>Al acabarse un golpe, 0x49BC le suma <b>a quien lo ha dado</b> lo "
          "que dice la tabla de 0x6854 &mdash;3, 2, 1 y 1&mdash;, y el que mas "
@@ -71,18 +75,22 @@ HALLAZGOS = {
          "a la primera bajada queda en <b>3:00</b>.</p>"),
     ],
     "en": [
-        ("Six opponents and only THREE sets of figures",
+        ("Six opponents, three archives and a hidden piece",
          "<p>The names come from a table of six pointers at 0x5661: "
          "RED&middot;WOLF, M.B.ALLI, MOAI&middot;KING, SANCHESS, "
-         "CHINA&middot;KHAN and MOAI&middot;Jr. The <b>drawings</b>, though, "
+         "CHINA&middot;KHAN and MOAI&middot;Jr. The <b>figures</b>, though, "
          "come from a table of <b>three</b> words at 0x52C9 &mdash;0x825C, "
          "0x9670 and 0xABB4&mdash; which 0x4F8D indexes with "
-         "<code>(0xE207) &amp; 3</code>. A fourth word would fall inside code, "
-         "but it is never read: 0x423B forces the jump to the next group of "
-         "sixteen as soon as the index reaches 2.</p>"
-         "<p>The three opponents of the second round are the first three "
-         "<b>with the colour swapped</b>: 0x526F and 0x51BE turn colour 4 "
-         "into 0x0C when (0xE207) has bit 4 set.</p>"),
+         "<code>(0xE207) &amp; 3</code>.</p>"
+         "<p>And still the six look different: every opponent figure carries "
+         "<b>one piece more</b> than it declares &mdash;0x5005 does an "
+         "<code>inc b</code> on the opponent's turn&mdash; and 0x5034 only "
+         "paints it in the second round: for SANCHESS <b>instead of</b> RED "
+         "WOLF's head (the hair down to the neck), for CHINA KHAN <b>on top "
+         "of</b> M.B.ALLI's (the pigtail) and for MOAI Jr. instead of MOAI "
+         "KING's empty sprite. And only the moai gets colour 4 turned into "
+         "0x0C by 0x526F and 0x51BE: blue into green. Checked against the "
+         "emulator's VRAM, sprites included, at zero.</p>"),
         ("Throwing a punch tires you, and it only lands on two frames",
          "<p>When a punch ends, 0x49BC adds to <b>whoever threw it</b> what "
          "the table at 0x6854 says &mdash;3, 2, 1 and 1&mdash;, and the punch "
@@ -159,19 +167,36 @@ GALERIA = [
      "The intro. The sign is 26 consecutive tiles in three rows that climb "
      "one row every two frames, fourteen times (0x462A)."),
     ("poses_jugador.png",
-     "Las diecinueve poses del jugador, montadas y colocadas con los ocho "
-     "bytes de disposicion de cada figura.",
-     "The player's nineteen poses, built and placed with each figure's eight "
-     "layout bytes."),
+     "Las diecinueve poses del jugador: las casillas colocadas con los ocho "
+     "bytes de disposicion de cada figura y los sprites encima.",
+     "The player's nineteen poses: the tiles placed with each figure's eight "
+     "layout bytes and the sprites on top."),
     ("poses_rival_1.png",
-     "El primer archivo de rival: RED&middot;WOLF y SANCHESS.",
-     "The first opponent archive: RED&middot;WOLF and SANCHESS."),
+     "RED&middot;WOLF, el archivo 2 en la primera vuelta: la pieza escondida "
+     "se salta.",
+     "RED&middot;WOLF, archive 2 on the first round: the hidden piece is "
+     "skipped."),
     ("poses_rival_2.png",
-     "El segundo: M.B.ALLI y CHINA&middot;KHAN.",
-     "The second: M.B.ALLI and CHINA&middot;KHAN."),
+     "M.B.ALLI, el archivo 3 sin la coleta.",
+     "M.B.ALLI, archive 3 without the pigtail."),
     ("poses_rival_3.png",
-     "El tercero es un moai: MOAI&middot;KING y MOAI&middot;Jr.",
-     "The third one is a moai: MOAI&middot;KING and MOAI&middot;Jr."),
+     "MOAI&middot;KING, el archivo 4 en azul y con un sprite vacio en la cara.",
+     "MOAI&middot;KING, archive 4 in blue with an empty sprite on the face."),
+    ("poses_rival_4.png",
+     "SANCHESS: el mismo archivo 2 con la primera pieza en vez de la segunda, "
+     "el pelo hasta el cuello.",
+     "SANCHESS: the same archive 2 with the first piece instead of the "
+     "second, the hair down to the neck."),
+    ("poses_rival_5.png",
+     "CHINA&middot;KHAN: el archivo 3 con todas las piezas, la coleta "
+     "incluida (0xAB2E, color 1).",
+     "CHINA&middot;KHAN: archive 3 with every piece, the pigtail included "
+     "(0xAB2E, colour 1)."),
+    ("poses_rival_6.png",
+     "MOAI&middot;Jr.: el archivo 4 con siete pixeles negros en la cara y el "
+     "color 4 cambiado por el 0x0C, verde.",
+     "MOAI&middot;Jr.: archive 4 with seven black pixels on the face and "
+     "colour 4 turned into 0x0C, green."),
     ("fuente.png",
      "La fuente: cuarenta y seis casillas desde la 0x30, casi ASCII. No hay "
      "Q &mdash;0x51 es un punto medio&mdash; ni Z, y 0x58 es un glifo con la "

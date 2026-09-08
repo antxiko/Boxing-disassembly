@@ -33,7 +33,9 @@ not come from the table: 0x55A0 puts it up separately.
 
 ![MOAI KING](img/combate_3.png)
 
-The **drawings**, though, are three. See [Findings](FINDINGS.html).
+The **figures** come from three archives, and the six still look different:
+each archive hides a piece that only the second round paints. See
+[Findings](FINDINGS.html).
 
 ## The round
 
@@ -51,8 +53,12 @@ two tiles at the edge **blink** with bit 4 of the frame counter.
 ![The player's nineteen poses](img/poses_jugador.png)
 
 Each boxer has **nineteen** poses. The body is made of **tiles** redefined
-every frame; the head and the gloves are 16x16 **sprites**. The poses run from
-the guard to the knockdown, and the last one is the victory pose, both gloves
-in the air.
+every frame; the head, the hair and the gloves are 16x16 **sprites**. The
+sheets are built the way the ring is: the tiles placed with the eight layout
+bytes of each figure and the sprites on top, with the pieces (0xE207) says.
+The poses run from the guard to the knockdown, and the last one is the victory
+pose, both gloves in the air.
 
-![The third archive is a moai](img/poses_rival_3.png)
+![MOAI KING](img/poses_rival_3.png)
+
+![MOAI Jr.: the same archive with colour 4 turned into 0x0C](img/poses_rival_6.png)

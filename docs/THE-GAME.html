@@ -91,15 +91,16 @@ audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
 <table><tr><th>option</th><th>byte</th><th>bit 0</th><th>bit 4</th></tr><tr><td>1PLAYER GAME A</td><td>0x40</td><td></td><td></td></tr><tr><td>1PLAYER GAME B</td><td>0x50</td><td></td><td>hard</td></tr><tr><td>2PLAYERS GAME A</td><td>0x61</td><td>two play</td><td></td></tr><tr><td>2PLAYERS GAME B</td><td>0x71</td><td>two play</td><td>hard</td></tr></table>
 <p><b>Bit 0</b> is what decides whether the machine plays: with it set, 0x47C0 skips <code>decide_la_maquina</code> and both boxers read their own controls. <b>Bit 4</b> picks the hard variant, which 0x42F5 turns into (0xE206) = 3 and (0xE207) = 0x10.</p>
 <h2 id="the-six-opponents">The six opponents</h2>
-<p><img src="img/combate_1.png?v=c4fdfbc0" alt="RED WOLF"></p>
+<p><img src="img/combate_1.png?v=d304138f" alt="RED WOLF"></p>
 <p>The names come from a table of six pointers at 0x5661, and they read out with the cartridge&#x27;s own font: <b>RED&amp;middot;WOLF</b>, <b>M.B.ALLI</b>, <b>MOAI&amp;middot;KING</b>, <b>SANCHESS</b>, <b>CHINA&amp;middot;KHAN</b> and <b>MOAI&amp;middot;Jr.</b> The player is always <b>RYU</b> (0x56AF), and his name does not come from the table: 0x55A0 puts it up separately.</p>
-<p><img src="img/combate_3.png?v=d0fa3b8b" alt="MOAI KING"></p>
-<p>The <b>drawings</b>, though, are three. See <a href="FINDINGS.html">Findings</a>.</p>
+<p><img src="img/combate_3.png?v=e374102c" alt="MOAI KING"></p>
+<p>The <b>figures</b> come from three archives, and the six still look different: each archive hides a piece that only the second round paints. See <a href="FINDINGS.html">Findings</a>.</p>
 <h2 id="the-round">The round</h2>
 <p>Three minutes, counted in four ASCII tiles from (0xE212) to (0xE215) that start at 3:01 and after the first tick read <b>3:00</b>. Three rounds to a bout: (0xE210) counts them and 0x57C7 bumps it.</p>
 <p>Below, the strip of <b>twenty-two tiles</b> on row 22 is a single bar that the two boxers eat into from the ends: the left-hand one from the start and the right-hand one from the finish (0x5448). Once the damage passes level 6, the two tiles at the edge <b>blink</b> with bit 4 of the frame counter.</p>
 <h2 id="the-boxers">The boxers</h2>
-<p><img src="img/poses_jugador.png?v=384ee9b7" alt="The player&#x27;s nineteen poses"></p>
-<p>Each boxer has <b>nineteen</b> poses. The body is made of <b>tiles</b> redefined every frame; the head and the gloves are 16x16 <b>sprites</b>. The poses run from the guard to the knockdown, and the last one is the victory pose, both gloves in the air.</p>
-<p><img src="img/poses_rival_3.png?v=f4bd40b5" alt="The third archive is a moai"></p>
+<p><img src="img/poses_jugador.png?v=5dcb6a70" alt="The player&#x27;s nineteen poses"></p>
+<p>Each boxer has <b>nineteen</b> poses. The body is made of <b>tiles</b> redefined every frame; the head, the hair and the gloves are 16x16 <b>sprites</b>. The sheets are built the way the ring is: the tiles placed with the eight layout bytes of each figure and the sprites on top, with the pieces (0xE207) says. The poses run from the guard to the knockdown, and the last one is the victory pose, both gloves in the air.</p>
+<p><img src="img/poses_rival_3.png?v=7d38a2f9" alt="MOAI KING"></p>
+<p><img src="img/poses_rival_6.png?v=e12bdb98" alt="MOAI Jr.: the same archive with colour 4 turned into 0x0C"></p>
 <footer><p><em>Konami's Boxing</em> was published by Konami for the MSX in 1985; its catalogue number is RC-736 and it is 32 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>

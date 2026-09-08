@@ -2,22 +2,47 @@
 
 What turned up when we took it apart. Each one with its measurement.
 
-## Six opponents and only THREE sets of figures
+## Six opponents, three archives, and a hidden piece for the second round
 
-There are six names, in a table of six pointers (0x5661). The **drawings** come
+There are six names, in a table of six pointers (0x5661). The **figures** come
 from another table, the one at 0x52C9, and that one has **three** words:
 0x825C, 0x9670 and 0xABB4, the tables of figure archives 2, 3 and 4. 0x4F8D
-indexes it with `(0xE207) & 3`.
+indexes it with `(0xE207) & 3`, and a fourth word would fall at 0x52CF, which
+is already code. It is never read: 0x423B forces the jump to the next group of
+sixteen as soon as the index reaches 2.
 
-A fourth word would fall at 0x52CF, which is already code. But it is never
-read: 0x423B forces the jump to the next group of sixteen as soon as
-`(0xE207) & 3` reaches 2, so the index is only ever 0, 1 or 2.
+And yet the six look different, and SANCHESS is not RED WOLF in another
+colour. Every figure in the three opponent archives carries **one piece more**
+than its header declares: the byte at +8 says N, but 0x5005 does an `inc b`
+on the opponent's turn &mdash;bit 1 of the frame counter&mdash; and walks N+1
+records and N+1 pointers. The first one is the piece of the **second round**,
+and 0x5034 (for the patterns) and 0x5187 (for the sprite attributes) decide
+what to do with it by looking at (0xE207):
 
-The three opponents of the second round are the first three **with the colour
-swapped**: 0x526F and 0x51BE turn colour 4 into 0x0C when (0xE207) has bit 4
-set.
+| (0xE207) | opponent | what 0x5034 does with the first piece |
+|---|---|---|
+| bit 4 clear | RED WOLF, M.B.ALLI, MOAI KING | skips it (0x5048) |
+| bit 4 set, bit 0 clear | SANCHESS, MOAI Jr. | paints it **instead of** the second (`ld a,002h`, 0x5040) |
+| bit 4 and bit 0 set | CHINA KHAN | paints **all** of them (`inc b`, 0x5045) |
 
-![The three opponent archives](img/poses_rival_2.png)
+So SANCHESS wears RED WOLF's body with **another head**: the hidden piece of
+archive 2 (0x9558) is the same face with the hair down to the neck, where
+0x856E keeps it short. CHINA KHAN is M.B.ALLI **plus** a black sprite (0xAB2E,
+colour 1): the pigtail hanging from his head. And MOAI Jr. swaps MOAI KING's
+empty sprite (0xBF7B, colour 0) for seven black pixels on the face (0xBF7D),
+and on top of that changes colour: 0x526F and 0x51BE turn colour 4 into 0x0C
+&mdash;dark blue into dark green&mdash; only when `(0xE207) & 3` is 2 and bit
+4 is set. The moai is the only one that changes colour.
+
+None of this is a reading of the code alone. The VRAM of the six rings, dumped
+from openMSX with each opponent forced into (0xE207), comes out with **zero
+differences** in the twelve sprite attributes, in the pattern bytes of every
+sprite on screen and in the body tiles of both boxers
+([In the emulator](IN-THE-EMULATOR.html)).
+
+![RED WOLF](img/poses_rival_1.png)
+
+![SANCHESS: the same nineteen poses, with the hair down to the neck](img/poses_rival_4.png)
 
 ## Throwing a punch tires you
 

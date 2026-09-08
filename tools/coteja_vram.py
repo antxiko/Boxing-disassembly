@@ -21,9 +21,17 @@ Lo que se compara y lo que NO:
 
   - color, patrones y nombres SI: son lo que dibuja la lamina, y se montan al
     entrar en la pantalla.
-  - los patrones de sprite y sus atributos NO: los rehace el gancho de
-    interrupcion cada cuadro y dependen del instante exacto, asi que compararlos
-    solo mediria el retardo del volcado.
+  - los patrones de sprite y sus atributos se comparan APARTE, en los
+    combates: los rehace el gancho de interrupcion cada cuadro, pero en el
+    instante del volcado los dos boxeadores estan en la accion y la columna
+    que apunta info_rivalN.txt, asi que se montan con esas y se comparan los
+    doce atributos y los 32 bytes de patron de cada sprite que se pinta. Los
+    patrones de partida se turnan con el contador de cuadros, y se leen del
+    propio volcado. Y lo mismo con las casillas del cuerpo que la tabla de
+    nombres tiene puestas en las filas 8 a 15. Sin esto el cotejo era ciego a
+    lo que distingue a los seis rivales -la melena de SANCHESS, la coleta de
+    CHINA KHAN y el verde de MOAI Jr. son sprites, color de sprite y color de
+    casilla-, y se publico que eran tres con el color cambiado.
   - de la tabla de nombres se dejan fuera las casillas que el marcador y el
     reloj reescriben cuadro a cuadro; van declaradas abajo, una a una.
 
@@ -87,6 +95,39 @@ def compara(nombre, mio, real, con_mascara=True):
     return total
 
 
+def compara_boxeadores(v, real):
+    """Los dos boxeadores tal como estan en el volcado: los doce atributos de
+    sprite (0 a 5 el jugador, 6 a 11 el rival), los 32 bytes de patron de cada
+    sprite que se pinta -los aparcados en la fila 0xCF no- y las casillas del
+    cuerpo -patron y color- que la tabla de nombres tiene puestas en las filas
+    8 a 15, que son las que `coloca` escribe."""
+    atrib = [a for a in range(0x3B00, 0x3B30) if v.v[a] != real[a]]
+    patrones = []
+    for k in range(12):
+        a = 0x3B00 + 4 * k
+        if real[a] == 0xCF:
+            continue
+        base = 0x1800 + (real[a + 2] & 0xFC) * 8
+        patrones += [x for x in range(base, base + 0x20) if v.v[x] != real[x]]
+    casillas = []
+    usadas = sorted({real[0x3800 + f * 32 + c] for f in range(8, 16)
+                     for c in range(32) if 0x30 <= real[0x3800 + f * 32 + c]
+                     < 0xD0})
+    for n in usadas:
+        for t in (0x2800 + n * 8, 0x0800 + n * 8):
+            casillas += [x for x in range(t, t + 8) if v.v[x] != real[x]]
+    print("  %-14s  atributos %d  patrones %d  casillas del cuerpo %d (%d "
+          "casillas)" % ("  boxeadores", len(atrib), len(patrones),
+                         len(casillas), len(usadas)), end="")
+    for que, malos in (("atributo", atrib), ("patron", patrones),
+                       ("casilla", casillas)):
+        if malos:
+            print(" (primer %s 0x%04X: %02X != %02X)"
+                  % (que, malos[0], v.v[malos[0]], real[malos[0]]), end="")
+    print("   TOTAL %d" % (len(atrib) + len(patrones) + len(casillas)))
+    return len(atrib) + len(patrones) + len(casillas)
+
+
 def main():
     rom = V.Rom(sys.argv[1], int(sys.argv[2], 0))
     carpeta = sys.argv[3]
@@ -107,13 +148,20 @@ def main():
         # (0xE208) sale de `prepara_la_partida`, que corre ANTES de que la
         # sonda imponga el rival, asi que se lee del volcado y no se supone.
         stage = None
+        accion = {"accion_derecha": 1, "accion_izquierda": 1}
         info = os.path.join(carpeta, "info_rival%d.txt" % r)
         if os.path.exists(info):
             for ln in open(info, encoding="utf-8"):
                 if ln.startswith("stage "):
                     stage = int(ln.split()[1])
-        v = P.combate(rom, r, stage=stage)
+                elif ln.split()[0] in accion:
+                    accion[ln.split()[0]] = int(ln.split()[1])
+        # el patron de partida de cada boxeador, del sprite 0 y del 6
+        v = P.combate(rom, r, accion["accion_derecha"],
+                      accion["accion_izquierda"], stage=stage,
+                      base_jugador=real[0x3B02], base_rival=real[0x3B1A])
         malos += compara("rival %d" % (r + 1), v.v, real)
+        malos += compara_boxeadores(v, real)
         hechos += 1
         if r == 0:
             # El PRIMER combate arranca con la zona de las figuras limpia, asi

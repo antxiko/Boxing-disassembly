@@ -116,7 +116,7 @@ F 0x680c 17
 # De 0x707E a 0xBFF0 no hay ni una `ld hl,NNNN` que apunte dentro salvo a la
 # PRIMERA tabla, la de 0x7086: todo lo demas se alcanza indexando. Asi que lo
 # que hay ahi no se puede decir mirandolo, hay que hacer lo mismo que el Z80.
-# Eso es tools/archivo_de_figuras.py, y explica 20.306 de los 20.338 bytes.
+# Eso es tools/archivo_de_figuras.py, y explica 20.312 de los 20.338 bytes.
 #
 # Cuatro archivos, cada uno con su tabla: 0x7086, 0x825C, 0x9670 y 0xABB4. Las
 # cuatro se cierran con la regla de la entrada mas baja y las cuatro dan
@@ -125,19 +125,27 @@ F 0x680c 17
 # La forma de una figura sale de leer 0x4F87..0x505C:
 #     +0        cuatro punteros a los guiones de fondo, que 0x4FC5 y 0x4FD1
 #               vuelcan en patrones y en colores
-#     +8        N, cuantas piezas moviles lleva
-#     +9        N registros de tres bytes (el bucle de 0x5007 va de tres en tres)
-#     +9+3N     ocho bytes que 0x500C se salta con `ld a,008h`
-#     +17+3N    N punteros a las piezas, que el bucle de 0x504A recorre
-# O sea 17 + 5N de cabecera, y no es una suposicion: en la figura 0x721E da
-# 0x721E + 29 = 0x723B, que es justo donde estan los cuatro punteros de piezas,
-# y sus cuatro piezas -0x7335, 0x7351, 0x7356 y 0x7370- teselan sin un hueco
-# hasta 0x7382, que es donde empieza la figura siguiente.
+#     +8        N, la cuenta de piezas moviles que declara la figura
+#     +9        M registros de tres bytes -fila, columna y color del sprite-
+#               (el bucle de 0x5007 va de tres en tres)
+#     +9+3M     ocho bytes de disposicion, que 0x500C se salta con `ld a,008h`
+#     +17+3M    M punteros a las piezas, que el bucle de 0x504A recorre
+# Y M no es N: 0x4FFE (y 0x513E) hace `inc b` cuando el bit 1 del contador de
+# cuadros esta puesto, y ese bit es el que reparte los turnos (0x4F8A): pares
+# el jugador, impares el rival. O sea que las figuras del archivo del jugador
+# llevan N registros y N punteros, y las de los tres archivos de rival llevan
+# N+1. La cabecera mide 17 + 5M, y no es una suposicion: en la figura 0x721E
+# (M = N = 4) da 0x721E + 29 = 0x723B, que es justo donde estan los cuatro
+# punteros de piezas, y sus cuatro piezas -0x7335, 0x7351, 0x7356 y 0x7370-
+# teselan sin un hueco hasta 0x7382, que es donde empieza la figura siguiente.
+# Y las 57 figuras de rival cierran con N+1 y NO con N: con N la tabla de
+# punteros se lee tres bytes desplazada y se sale del archivo a la primera.
 #
-# La cuenta de piezas es N o N+1: 0x5005 hace `inc b` cuando el bit 1 del
-# contador de cuadros esta puesto. Se prueban las dos y se queda la que da
-# punteros creibles; con la equivocada la tabla se lee tres bytes desplazada y
-# se sale de rango a la primera. Las SETENTA Y SEIS figuras cierran asi.
+# La pieza de mas del rival es la PRIMERA, y es la de la SEGUNDA VUELTA:
+# 0x5034 (patrones) y 0x5187 (atributos) la saltan con el bit 4 de (0xE207)
+# a cero; con el bit 4 puesto y el bit 0 a cero -SANCHESS y MOAI Jr.- la
+# pintan EN VEZ de la segunda, y con los dos puestos -CHINA KHAN- pintan
+# todas. Asi es como de tres archivos salen seis rivales distintos.
 #
 # Los guiones se meten unos dentro de otros porque COMPARTEN LA COLA: una
 # figura empieza a mitad del guion de otra para redibujar solo lo que cambia.
@@ -483,10 +491,10 @@ D 0x9610 0x9633 guiones_9610  1 piezas de sprite encajados: los que comparten co
 F 0x9610 16
 D 0x9633 0x9653 guiones_9633  1 piezas de sprite encajados: los que comparten cola empiezan dentro del anterior
 F 0x9633 16
-D 0x9653 0x9669 cabecera_de_la_figura_9653  Archivo 4: cuatro punteros de fondo, 1 piezas de tres bytes y sus 1 punteros; mide 17 + 5*1 = 22
+D 0x9653 0x966e cabecera_de_la_figura_9653  La figura 18 de los archivos 2, 3 y 4, la vacia: cuatro punteros de fondo a 0x966E, 1 pieza declarada pero 2 registros -el de mas que el rival lleva siempre-, los ocho de disposicion y sus 2 punteros, los dos a 0x966E; mide 17 + 5*2 = 27
 F 0x9653 8
-D 0x966e 0x966f guiones_966E  1 guiones de figura encajados: los que comparten cola empiezan dentro del anterior
-F 0x966e 16
+D 0x966e 0x9670 pieza_vacia_del_archivo_3  `00 20`: leido como guion de figura es un 0x00, se acabo, y leido como pieza son treinta y dos ceros, un sprite en blanco. Los cuatro guiones de fondo y las dos piezas de 0x9653 apuntan aqui
+F 0x966e 2
 D 0x9670 0x9696 punteros_del_archivo_3  Las 19 figuras del archivo 3. La tabla la cierra su entrada mas baja, y los cuatro archivos dan 19 clavadas
 F 0x9670 w
 D 0x9696 0x96bb cabecera_de_la_figura_9696  Archivo 3: cuatro punteros de fondo, 4 piezas de tres bytes y sus 4 punteros; mide 17 + 5*4 = 37
@@ -901,9 +909,6 @@ F 0x6906 6
 D 0x6930 0x695a retrato_4  El cuarto, que cierra justo donde empieza el motor de sonido
 F 0x6930 6
 
-D 0x9669 0x9670 pieza_vacia_del_archivo_3  El puntero 0x966E repetido y la pieza que apunta: `00 20`, o sea treinta y dos ceros. Un sprite en blanco
-F 0x9669 7
-
 # ======================================================================
 # LAS TABLAS CORTAS, cada una con quien la lee
 # ======================================================================
@@ -947,8 +952,11 @@ F 0x52bc w
 # caeria en 0x52CF, que ya es codigo -los dos primeros bytes de L_52CF-, y da
 # 0x8321. No se lee nunca: 0x423B fuerza el salto al siguiente grupo de
 # dieciseis en cuanto (0xE207) & 3 llega a 2, asi que el indice solo vale 0, 1
-# o 2. De ahi que haya SEIS rivales y solo TRES juegos de figuras: los tres
-# segundos son los tres primeros con el color cambiado (0x526F y 0x51BE).
+# o 2. Seis rivales y tres archivos, y aun asi los seis se distinguen: cada
+# figura de rival lleva una pieza de mas -la primera- que 0x5034 solo pinta en
+# la segunda vuelta: en SANCHESS y MOAI Jr. sustituye a la segunda, y en CHINA
+# KHAN se anade (la coleta). Y a MOAI Jr. ademas 0x526F y 0x51BE le cambian el
+# azul (4) por el verde (0x0C). Ver las notas de los archivos, mas abajo.
 D 0x52c4 0x52c9 patrones_de_partida_del_boxeador  Cinco bytes -0xA8, 0x30, 0x58, 0x80 y 0xA8- que 0x5155 lee desde el primero y 0x5207 desde el segundo, con el mismo indice: la misma vuelta, corrida un puesto
 F 0x52c4 5
 
@@ -2143,7 +2151,8 @@ B 0x4f45 ======================================================================
 B 0x4f45 Los boxeadores se pintan de dos maneras a la vez: el cuerpo son
 B 0x4f45 CASILLAS de la pantalla, que 0x4F66 saca de los archivos de figuras, y
 B 0x4f45 los guantes y la cabeza son SPRITES, que monta 0x5178. La cabecera de
-B 0x4f45 una figura -17 + 5N- esta medida arriba, en las notas de los archivos.
+B 0x4f45 una figura -17 + 5M, con M = N para el jugador y N+1 para el rival-
+B 0x4f45 esta medida arriba, en las notas de los archivos.
 L 0x4f45 prepara_el_dibujo
 C 0x4f45 el contador de cuadros
 C 0x4f48 uno de cada dos
@@ -2202,8 +2211,8 @@ C 0x4ffb a HL
 C 0x4ffc N, las piezas moviles
 C 0x4ffe el contador de cuadros
 C 0x5001 el bit 1, al acarreo
-C 0x5003 uno de cada cuatro...
-C 0x5005 ...lleva una pieza mas
+C 0x5003 en el turno del rival -bit 1 puesto-...
+C 0x5005 ...la figura lleva un registro mas: la pieza de la segunda vuelta
 C 0x5006 saltarse la cuenta
 C 0x5007 los registros son de tres bytes
 C 0x500c y detras hay ocho que no se leen aqui
@@ -2215,13 +2224,13 @@ C 0x501e o media pantalla mas alla
 C 0x5021 y el bit 2
 C 0x5025 y el bit 2 la sube otras 0xC0
 C 0x502f el desplazamiento de color, a A'
-C 0x5032 sin desplazar, directo
-C 0x5034 (0xE207)
-C 0x5037 el bit 4, que sale del menu
-C 0x503b y el bit 0
-C 0x5040 dos
-C 0x5045 una pieza mas
-C 0x5048 y si no, se salta el primer puntero
+C 0x5032 el jugador: todas las piezas seguidas
+C 0x5034 el rival: (0xE207) decide que se hace con la primera pieza
+C 0x5037 el bit 4: la segunda vuelta
+C 0x503b y el bit 0: CHINA KHAN
+C 0x5040 SANCHESS y MOAI Jr.: tras la primera pieza se salta un puntero, la primera SUSTITUYE a la segunda
+C 0x5045 CHINA KHAN las pinta todas: la primera es su coleta
+C 0x5048 y en la primera vuelta la primera pieza se salta
 C 0x504a pieza por pieza
 C 0x504b el puntero de la pieza
 C 0x504e y se pinta
@@ -2312,8 +2321,8 @@ C 0x513a nada que pintar
 C 0x513d la cuenta de piezas
 C 0x513e el contador de cuadros
 C 0x5141 el bit 1, al acarreo
-C 0x5143 uno de cada cuatro...
-C 0x5145 ...lleva una pieza mas
+C 0x5143 en el turno del rival...
+C 0x5145 ...un registro mas, el de la segunda vuelta
 C 0x5147 los registros son de tres bytes
 C 0x514c a DE
 C 0x514d el contador de cuadros
@@ -2344,13 +2353,13 @@ C 0x517b los tres de arriba
 C 0x517e y de vuelta a A
 C 0x517f sin paso entre registros
 C 0x5182 el desplazamiento, de vuelta a A'
-C 0x5185 sin desplazar, directo
-C 0x5187 (0xE207), que sale del menu
-C 0x518a el bit 4, que sale del menu
-C 0x518e y el bit 0
-C 0x5193 tres
-C 0x5198 un sprite mas
-C 0x519b y si no, se salta el primer registro
+C 0x5185 el jugador: todos los registros seguidos
+C 0x5187 el rival: (0xE207) decide, igual que en 0x5034
+C 0x518a el bit 4: la segunda vuelta
+C 0x518e y el bit 0: CHINA KHAN
+C 0x5193 SANCHESS y MOAI Jr.: tras el primer registro se salta el segundo
+C 0x5198 CHINA KHAN: un sprite mas, la coleta
+C 0x519b primera vuelta: el primer registro se salta
 C 0x519e seis sprites en total...
 C 0x51a0 ...menos los que se van a pintar
 C 0x51a2 el puerto de datos del VDP
@@ -2363,9 +2372,9 @@ C 0x51ae ...mas la del registro
 C 0x51b1 el patron, que va en A'
 C 0x51b5 cada sprite se come cuatro patrones
 C 0x51ba por debajo del patron 0x30, el color tal cual
-C 0x51be (0xE207)
-C 0x51c9 el color 4...
-C 0x51cc ...se cambia por el 0x0C
+C 0x51be y de los del rival solo MOAI Jr.: bits 4 y 1 de (0xE207)
+C 0x51c9 su color 4, el azul del moai...
+C 0x51cc ...se cambia por el 0x0C, verde
 C 0x51d1 y ese es el color
 C 0x51d3 al otro juego
 C 0x51d4 el paso entre registros
@@ -2407,15 +2416,18 @@ C 0x5243 ocho veces
 L 0x5246 saca_la_palabra
 C 0x5246 (HL) a HL, que es lo que hacen todas las tablas de punteros
 B 0x526f ----------------------------------------------------------------------
-B 0x526f El cambio de color, que solo entra con (0xE207) puesto de cierta manera
-B 0x526f y en la mitad de los cuadros: el color 4 pasa a 0x0C, tinta y fondo.
+B 0x526f El cambio de color de MOAI Jr. En el turno del rival -bit 1 del
+B 0x526f contador-, con el bit 4 de (0xE207) puesto y (0xE207) & 3 == 2, el
+B 0x526f color 4 -el azul del moai- pasa a 0x0C, verde, tinta y fondo. Es lo
+B 0x526f unico que distingue el cuerpo de MOAI Jr. del de MOAI KING; la cara
+B 0x526f se la cambia 0x5034 con la pieza de la segunda vuelta.
 L 0x526f saca_el_byte_con_el_color_cambiado
 C 0x526f el contador de cuadros
 C 0x5272 el bit 1
 C 0x5276 (0xE207)
 C 0x5279 el bit 4
 C 0x527d los dos de abajo
-C 0x527f con el 2 exacto se cambia
+C 0x527f solo con el 2: el archivo del moai, o sea MOAI Jr.
 C 0x5283 el byte
 C 0x5284 el fondo
 C 0x5287 el 4...

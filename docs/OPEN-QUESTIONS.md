@@ -27,17 +27,11 @@ halfway point&mdash; or it may be a value put in by eye.
 punch. It works as a second button, but it has not been checked in the emulator
 whether the game does anything different with it or it is only convenience.
 
-## The 32 bytes missing from the figure archives
+## The 26 bytes missing from the figure archives
 
-`tools/archivo_de_figuras.py` explains **20,306 of the 20,338 bytes** of
-0x707E..0xBFF0 by walking the four tables and their 76 figures. **32 bytes in
-four gaps** are left. They are declared as data and nobody reads them along any
+`tools/archivo_de_figuras.py` explains **20,312 of the 20,338 bytes** of
+0x707E..0xBFF0 by walking the four tables and their 76 figures, each with the
+piece count the Z80 really walks. **26 bytes in two gaps** are left: eight in
+front of the first table (0x707E) and eighteen right before Konami's hidden
+mark (0xBFDE). They are declared as data and nobody reads them along any
 traced path, but what they are is not known.
-
-## Three figures that fit both counts
-
-A figure's piece count is N or N+1 &mdash;0x5005 does an `inc b` depending on
-bit 1 of the frame counter&mdash; and it is settled by seeing which of the two
-leaves the pieces chained without a gap. On **three** figures (the three of
-archive 3 at 0x9653) both fit, so there the choice is whichever the tool tries
-first and not a measurement.

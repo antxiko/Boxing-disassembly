@@ -14,7 +14,8 @@ Lo que sale:
     fuente.png           las casillas 0x30..0x5D de la fuente
     combate_N.png        el cuadrilatero de cada uno de los seis rivales
     poses_jugador.png    las 19 figuras del archivo del jugador
-    poses_rival_N.png    las 19 de cada uno de los tres archivos de rival
+    poses_rival_N.png    las 19 de cada uno de los SEIS rivales, cuerpo y
+                         sprites, con las piezas que (0xE207) manda pintar
 
 Uso: pantallas.py <rom> <org> <carpeta de salida>
 """
@@ -149,24 +150,59 @@ def push_space_key(rom):
     return v
 
 
-def figura(rom, v, tabla, accion, destino):
+def e207_del_rival(rival):
+    """Lo que vale (0xE207) con cada uno de los seis rivales, del 0 al 5: los
+    dos bits de abajo dicen el archivo y el bit 4 la segunda vuelta."""
+    return rival if rival < 3 else 0x10 + (rival - 3)
+
+
+def piezas_que_se_pintan(m, e207):
+    """Que piezas de la figura se pintan, y en que orden. 0x5034..0x5049 lo
+    decide para los patrones y 0x5187..0x519D hace lo mismo para los
+    atributos.
+
+    El jugador (e207 None) las pinta todas. El rival lleva una pieza de mas
+    -la primera, ver archivo_de_figuras.piezas_de_la_figura- y (0xE207) dice
+    que se hace con ella:
+
+      - bit 4 a cero, la primera vuelta: se SALTA (0x5048), y van de la 1 a
+        la M-1. RED WOLF, M.B.ALLI y MOAI KING.
+      - bit 4 puesto y bit 0 a cero, SANCHESS y MOAI Jr.: la primera
+        SUSTITUYE a la segunda. El `ld a,002h` de 0x5040 se suma al puntero
+        una sola vez, tras la primera pieza, y salta la segunda: 0, 2, 3...
+      - bit 4 y bit 0 puestos, CHINA KHAN: el `inc b` de 0x5045 las pinta
+        TODAS, de la 0 a la M-1. La de mas es su coleta.
+    """
+    if e207 is None:
+        return list(range(m))
+    if not e207 & 0x10:
+        return list(range(1, m))
+    if e207 & 0x01:
+        return list(range(m))
+    return [0] + list(range(2, m))
+
+
+def figura(rom, v, tabla, accion, destino, e207=None):
     """El trozo de `pinta_una_figura` (0x4F66) que redibuja el cuerpo.
 
     Cuatro punteros: los dos primeros van a los PATRONES desde `destino` y los
     dos siguientes a los COLORES, que estan en la misma posicion con el bit 13
     quitado (el `res 5,a` de 0x4F81). Los de patrones usan el formato de
     `vuelca_un_guion_de_pieza` (0x529D) y los de color el de `vuelca_un_guion`
-    (0x5060).
+    (0x5060), que pasa cada byte por 0x526F: en el turno del rival, con el
+    bit 4 de (0xE207) y (0xE207) & 3 == 2 -MOAI Jr., y solo el- el color 4
+    se cambia por el 0x0C. Es lo que lo pone verde donde MOAI KING es azul.
     """
     p = rom.w(tabla + 2 * accion)
     V.vuelca_guion_de_pieza(rom, v, rom.w(p), destino)
     V.vuelca_guion_de_pieza(rom, v, rom.w(p + 2))
     color = destino & ~0x2000
-    V.vuelca_guion(rom, v, rom.w(p + 4), color)
-    V.vuelca_guion(rom, v, rom.w(p + 6))
+    verde = e207 is not None and bool(e207 & 0x10) and (e207 & 3) == 2
+    V.vuelca_guion(rom, v, rom.w(p + 4), color, cambia_color=verde)
+    V.vuelca_guion(rom, v, rom.w(p + 6), cambia_color=verde)
 
 
-def coloca(rom, v, tabla, accion, base, columna):
+def coloca(rom, v, tabla, accion, base, columna, rival=False):
     """`prepara_la_cuenta` (0x51FF) y su bucle de 0x5213: pone en la tabla de
     nombres las casillas que la figura ocupa.
 
@@ -182,11 +218,10 @@ def coloca(rom, v, tabla, accion, base, columna):
     """
     p = rom.w(tabla + 2 * accion)
     # Cuantas piezas lleva NO se cree del byte de +8: 0x5005 y 0x513E le suman
-    # una segun el bit 1 del contador de cuadros, asi que la cuenta buena es la
-    # que hace que las piezas -32 bytes cada una- encadenen sin hueco. Eso es
-    # lo que mide archivo_de_figuras.py, y de ahi sale donde empiezan los ocho
-    # bytes de disposicion.
-    m, _, _ = A.piezas_de_la_figura(rom.d, p)
+    # una en los turnos del rival, asi que las figuras de rival llevan un
+    # registro de mas. Eso es lo que mide archivo_de_figuras.py, y de ahi
+    # sale donde empiezan los ocho bytes de disposicion.
+    m, _, _ = A.piezas_de_la_figura(rom.d, p, rival)
     disp = p + 9 + 3 * m
     cod = base
     for f in range(8):
@@ -215,51 +250,60 @@ def campana(rom, v, e26c=0xED, e26d=0):
             p += 1
 
 
-def piezas_y_sprites(rom, v, tabla, accion, base_patron, pixel, atrib):
-    """Las piezas moviles de una figura: la cabeza y los guantes, que NO son
-    casillas sino SPRITES de 16x16.
+def piezas_y_sprites(rom, v, tabla, accion, base_patron, pixel, atrib,
+                     e207=None):
+    """Las piezas moviles de una figura: la cabeza, el pelo y los guantes, que
+    NO son casillas sino SPRITES de 16x16.
 
     `pinta_una_pieza` (0x54F1) suelta los 32 bytes de cada pieza seguidos en la
     tabla de patrones de sprite, desde 0x1800 mas el desplazamiento que dice el
     contador de cuadros (0x5013), y ese mismo desplazamiento entre ocho es el
-    numero de patron de partida.
+    numero de patron de partida. Que piezas, y en que orden, lo dice
+    `piezas_que_se_pintan`: el rival no las pinta todas.
 
     `monta_los_sprites_de_una_figura` (0x5178) escribe los cuatro bytes de cada
     sprite del tiron: la fila es 0x3F mas el primer byte del registro, la
     columna el pixel del boxeador mas el segundo, el patron sube de cuatro en
-    cuatro y el color es el tercero. Los que sobran hasta seis se aparcan en la
-    fila 0xCF.
+    cuatro y el color es el tercero... salvo para MOAI Jr.: de los patrones
+    0x30 en adelante -los del rival-, con los bits 4 y 1 de (0xE207) puestos,
+    0x51BE cambia el color 4 por el 0x0C. Los sprites que sobran hasta seis se
+    aparcan en la fila 0xCF.
     """
     p = rom.w(tabla + 2 * accion)
-    m, ptr, _ = A.piezas_de_la_figura(rom.d, p)
+    m, ptr, _ = A.piezas_de_la_figura(rom.d, p, e207 is not None)
+    cuales = piezas_que_se_pintan(m, e207)
     destino = 0x1800 + base_patron * 8
     v.setwrt(destino)
-    for q in ptr:
-        V.pinta_pieza(rom, v, q, destino)
+    for k in cuales:
+        V.pinta_pieza(rom, v, ptr[k], destino)
         destino += 0x20
-    reg = p + 9
     v.setwrt(atrib)
     patron = base_patron
-    for k in range(m):
+    verde = e207 is not None and (e207 & 0x12) == 0x12
+    for k in cuales:
+        reg = p + 9 + 3 * k
         v.pon((0x3F + rom.b(reg)) & 0xFF)
         v.pon((pixel + rom.b(reg + 1)) & 0xFF)
         v.pon(patron)
-        v.pon(rom.b(reg + 2))
+        color = rom.b(reg + 2)
+        if patron >= 0x30 and verde and color == 0x04:
+            color = 0x0C
+        v.pon(color)
         patron = (patron + 4) & 0xFF
-        reg += 3
-    for k in range(6 - m):
+    for k in range(6 - len(cuales)):
         for _ in range(4):
             v.pon(0xCF)
 
 
-def combate(rom, rival=0, accion_jugador=1, accion_rival=1, stage=None):
+def combate(rom, rival=0, accion_jugador=1, accion_rival=1, stage=None,
+            base_jugador=0x30, base_rival=0x48):
     """`monta_el_combate` (0x554B), entero y en el orden en que lo hace.
 
     Los guiones se encadenan: unos siguen por donde acabo el anterior, que es
     lo que hace que la cola se comparta. Y el nombre del rival sale de la tabla
     de 0x5661 indexada con (0xE207) mas tres si lleva el bit 4.
     """
-    e207 = rival if rival < 3 else 0x10 + (rival - 3)
+    e207 = e207_del_rival(rival)
     # `monta_el_combate` NO borra la VRAM: apaga la pantalla, escribe lo suyo
     # encima y la vuelve a encender. Asi que se parte de lo que dejo la
     # pantalla anterior -la letra en los tres bancos y hasta los restos del
@@ -309,13 +353,17 @@ def combate(rom, rival=0, accion_jugador=1, accion_rival=1, stage=None):
     for destino in (0x2980, 0x2C00):
         figura(rom, v, 0x7086, accion_jugador, destino)
     for destino in (0x2AC0, 0x2D40):
-        figura(rom, v, arch, accion_rival, destino)
+        figura(rom, v, arch, accion_rival, destino, e207)
     coloca(rom, v, 0x7086, accion_jugador, 0x80, 22)
-    coloca(rom, v, arch, accion_rival, 0x58, 2)
-    # y sus piezas moviles, que son sprites: el jugador con los patrones de
-    # 0x30 en los sprites 0 a 5 y el rival con los de 0x48 en los 6 a 11.
-    piezas_y_sprites(rom, v, 0x7086, accion_jugador, 0x30, 22 * 8 + 24, 0x3B00)
-    piezas_y_sprites(rom, v, arch, accion_rival, 0x48, 2 * 8 + 24, 0x3B18)
+    coloca(rom, v, arch, accion_rival, 0x58, 2, rival=True)
+    # y sus piezas moviles, que son sprites: el jugador en los sprites 0 a 5
+    # y el rival en los 6 a 11. Los patrones de partida van turnandose con
+    # los bits 1 y 2 del contador de cuadros -0x00 o 0x18 el jugador, 0x30 o
+    # 0x48 el rival-; aqui se eligen, y el cotejo pasa los del volcado.
+    piezas_y_sprites(rom, v, 0x7086, accion_jugador, base_jugador,
+                     22 * 8 + 24, 0x3B00)
+    piezas_y_sprites(rom, v, arch, accion_rival, base_rival,
+                     2 * 8 + 24, 0x3B18, e207)
     return v
 
 
@@ -368,34 +416,42 @@ def main():
         guarda(V.pinta_pantalla(combate(rom, r)),
                os.path.join(out, "combate_%d.png" % (r + 1)))
 
-    for nombre, tabla in (("jugador", 0x7086),
-                          ("rival_1", rom.w(0x52C9)),
-                          ("rival_2", rom.w(0x52CB)),
-                          ("rival_3", rom.w(0x52CD))):
-        guarda(hoja_de_figuras(rom, tabla), os.path.join(out, "poses_%s.png"
-                                                         % nombre), 2)
+    guarda(hoja_de_figuras(rom, 0x7086),
+           os.path.join(out, "poses_jugador.png"), 2)
+    for r in range(6):
+        e207 = e207_del_rival(r)
+        guarda(hoja_de_figuras(rom, rom.w(0x52C9 + 2 * (e207 & 3)), e207),
+               os.path.join(out, "poses_rival_%d.png" % (r + 1)), 2)
 
 
-def hoja_de_figuras(rom, tabla, cuantas=19, cols=7, tw=8, th=8, sep=2):
-    """Las poses de un archivo, cada una montada y COLOCADA con sus ocho bytes
-    de disposicion, que es lo unico que dice de verdad como encajan."""
-    cw, ch = tw * 8 + sep, th * 8 + sep
+def hoja_de_figuras(rom, tabla, e207=None, cuantas=19, cols=7, sep=2):
+    """Las poses de un boxeador, cada una montada ENTERA: las casillas del
+    cuerpo colocadas con sus ocho bytes de disposicion y, encima, los sprites
+    de la cabeza y los guantes con las piezas que (0xE207) manda pintar. Sin
+    los sprites la hoja miente: la mitad de los guantes no estan en las
+    casillas, y lo que distingue a SANCHESS de RED WOLF es un sprite.
+
+    Cada pose se monta en una VRAM limpia por el mismo camino que el
+    cuadrilatero -la figura en la columna 4 y las filas 8 a 15, donde viven
+    los boxeadores- y se recorta con margen, porque los sprites asoman por
+    fuera del cuerpo: el registro mas alto de un rival cae 0x38 lineas por
+    debajo de la figura y el mas ancho 0x30 pixeles a la derecha.
+    """
+    X0, Y0, ANCHO, ALTO = 16, 48, 104, 88
+    cw, ch = ANCHO + sep, ALTO + sep
     filas = (cuantas + cols - 1) // cols
-    w, h = cols * cw + sep, filas * ch + sep
-    lienzo = [[(0x18, 0x18, 0x20)] * w for _ in range(h)]
+    fondo = (0x18, 0x18, 0x20)
+    lienzo = [[fondo] * (cols * cw + sep) for _ in range(filas * ch + sep)]
+    rival = e207 is not None
     for k in range(cuantas):
         v = V.Vram()
-        figura(rom, v, tabla, k, 0x2980)
-        coloca(rom, v, tabla, k, 0x30, 0)
+        figura(rom, v, tabla, k, 0x2980, e207)
+        coloca(rom, v, tabla, k, 0x30, 4, rival)
+        piezas_y_sprites(rom, v, tabla, k, 0x30, 4 * 8 + 24, 0x3B00, e207)
+        px = V.pinta_pantalla(v, fondo)
         ox, oy = sep + (k % cols) * cw, sep + (k // cols) * ch
-        for f in range(th):
-            for c in range(tw):
-                n = v.v[V.NOMBRES + (8 + f) * 32 + c]
-                if not n:
-                    continue
-                d = V.casilla(v, n, 1)
-                for y in range(8):
-                    lienzo[oy + f * 8 + y][ox + c * 8:ox + c * 8 + 8] = d[y]
+        for y in range(ALTO):
+            lienzo[oy + y][ox:ox + ANCHO] = px[Y0 + y][X0:X0 + ANCHO]
     return lienzo
 
 
