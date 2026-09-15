@@ -1238,8 +1238,8 @@ L_46F9:
 	ldir		;470a   ; de vuelta a su sitio
 	ret			;470c
 el_cuadro_del_de_la_izquierda:
-	xor a			;470d   ; escribe en 0x4F84, que es ROM: no hace nada. Codigo que sobro
-	ld (04f84h),a		;470e
+	xor a			;470d   ; el cero que va a escribir la linea siguiente
+	ld (04f84h),a		;470e   ; lo mete en 0x4F84, que es el `pop af` de la rutina de figuras. Desde ROM NO llega, asi que aqui no hace nada; en una copia cargada en RAM ese `pop af` se volveria un `nop` y la pila quedaria descuadrada en mitad del dibujado. Encaja con las protecciones anticopia de la casa -inofensivas en cartucho, letales en RAM- que Manuel Pazos identifico en el RC-727
 	ld hl,0e282h		;4711   ; baja dos temporizadores mas
 	call baja_un_temporizador		;4714
 	ld l,051h		;4717   ; HL era 0xE282, asi que ahora es 0xE251

@@ -1272,7 +1272,8 @@ C 0x46f3 el bloque del rival esta en 0xE232
 C 0x46f9 once bytes a la zona de trabajo
 C 0x4704 y ahi se hace el cuadro
 C 0x470a de vuelta a su sitio
-C 0x470d escribe en 0x4F84, que es ROM: no hace nada. Codigo que sobro
+C 0x470d el cero que va a escribir la linea siguiente
+C 0x470e lo mete en 0x4F84, que es el `pop af` de la rutina de figuras. Desde ROM NO llega, asi que aqui no hace nada; en una copia cargada en RAM ese `pop af` se volveria un `nop` y la pila quedaria descuadrada en mitad del dibujado. Encaja con las protecciones anticopia de la casa -inofensivas en cartucho, letales en RAM- que Manuel Pazos identifico en el RC-727
 C 0x4711 baja dos temporizadores mas
 C 0x471c y el jugador, que esta en 0xE255
 C 0x4723 baja uno si no esta ya a cero
